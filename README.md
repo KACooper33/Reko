@@ -88,8 +88,10 @@ v1 targets **Android only**. iOS is deferred pending validation — see D3 in `T
 ## Repo layout
 
 ```
-TASKS.md     Current work, locked decisions (D1–D10), open questions
-README.md    This file
+TASKS.md        Current work, locked decisions (D1–D10), open questions
+README.md       This file
+setup-repo.sh   One-time GitHub labels + milestones setup (requires gh CLI)
+.gitignore      Secrets first, then deps, Expo, native builds, and Track A data
 ```
 
 ---
