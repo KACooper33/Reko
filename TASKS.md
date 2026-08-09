@@ -22,7 +22,10 @@ Last updated: 2026-08-07
 
 **Accounts and identifiers**
 
-- **EAS project exists** — created 2026-08-08, linked to GitHub. Project ID `6b9e55ce-906f-4931-951e-617e74c761e8`. Link with `eas init --id <that>`; plain `eas init` would create a second project. It belongs in `app.json` under `extra.eas.projectId` and is **committed, not a secret** — see `docs/android-emulator-setup.md` §6
+- **EAS project — linked 2026-08-08.** `@kacooper/reko`, ID `6b9e55ce-906f-4931-951e-617e74c761e8`, owner `kacooper`. Both live in `app.json` (`extra.eas.projectId` and `owner`) and are **committed, not secrets** — see `docs/android-emulator-setup.md` §6
+  - Moved out of the `smallbytes` organisation after creation. **The transfer preserved the project ID**, so nothing recorded here went stale
+  - The account was also renamed `kacooper33` → `kacooper`. `~/.expo/state.json` still caches the old username; trust `eas whoami`, not the file
+  - `eas.json` is committed: `development` and `preview` both build an **APK** under internal distribution. An AAB cannot be sideloaded from a link, which is all B1 does
 - **The shipped app holds no secrets.** That follows from D7 (build-time model only) and local-first. The only two secrets in this project are the UMLS UTS API key (A1) and any model key (A8). Both stay on the laptop in `.env`, which `.gitignore` covers. EAS holds the Android signing key
 
 ### D9 rationale — why Reko

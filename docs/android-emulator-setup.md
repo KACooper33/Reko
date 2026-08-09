@@ -391,16 +391,28 @@ dependency that raises a floor.
 
 ## 6. Configure EAS
 
+> ✅ **Done on this machine, 2026-08-08.** The project is linked and `eas.json` is
+> committed. `eas project:info` reports `fullName @kacooper/reko`, ID
+> `6b9e55ce-906f-4931-951e-617e74c761e8`.
+>
+> The project was moved from the `smallbytes` organisation to the `kacooper` account after
+> creation. **The transfer preserved the project ID** — the same UUID linked without
+> complaint, so nothing recorded here went stale.
+
 The Expo project **already exists** — created 2026-08-08, linked to GitHub. So link to it;
 do not create a second one.
 
 ```bash
 npm install -g eas-cli
-eas login
-eas init --id 6b9e55ce-906f-4931-951e-617e74c761e8   # link the EXISTING project
-eas project:info                                     # confirm it linked to Reko
-eas build:configure -p android                       # writes eas.json
+eas login                                            # already done; verify with eas whoami
+eas init --id 6b9e55ce-906f-4931-951e-617e74c761e8 --non-interactive
+eas project:info                                     # confirm fullName and ID
+printf '\n\n' | eas build:configure -p android       # writes eas.json
 ```
+
+> `eas init` accepts `--non-interactive`. **`eas build:configure` does not** — it fails with
+> `Nonexistent flag`. Pipe newlines into it instead, as above, so it cannot block waiting
+> for input.
 
 > **Use `--id`.** Plain `eas init` *creates* a project. Run it against an account that
 > already has one and you get two, then build against the wrong one and wonder why the
@@ -411,18 +423,25 @@ It is not a secret — Expo publishes it, it appears in build URLs, and EAS's ow
 need to read it from the repo. Do not move it to an environment variable; a clean checkout
 must be able to build.
 
-If `eas project:info` reports an account name different from your login, add the owner to
-`app.json` or builds will fail to resolve the project:
+**`eas init` writes the `owner` field itself.** It resolved to `"owner": "kacooper"` here
+without being asked. Verify it rather than adding it by hand — a wrong value makes builds
+fail to resolve the project, and that matters when you own more than one account.
 
-```json
-{ "expo": { "owner": "<expo-account-name>" } }
-```
+Also check `eas whoami` if two accounts are in play. It reports the live account names, and
+they can change: this account was renamed from `kacooper33` to `kacooper` mid-project.
+`~/.expo/state.json` keeps caching the old username, so trust the CLI, not the file.
 
-Edit `eas.json` so the development profile produces an APK:
+### eas.json
+
+`build:configure` generates a working file. **Two edits are still needed** — add
+`android.buildType: "apk"` to `development` and `preview`. This is the committed result:
 
 ```json
 {
-  "cli": { "version": ">= 5.0.0" },
+  "cli": {
+    "version": ">= 21.7.0",
+    "appVersionSource": "remote"
+  },
   "build": {
     "development": {
       "developmentClient": true,
@@ -433,12 +452,21 @@ Edit `eas.json` so the development profile produces an APK:
       "distribution": "internal",
       "android": { "buildType": "apk" }
     },
-    "production": {}
-  }
+    "production": { "autoIncrement": true }
+  },
+  "submit": { "production": {} }
 }
 ```
 
-`buildType: "apk"` is required — Android development builds must be APK, not AAB.
+Two things the generator adds that older examples omit, both worth keeping:
+
+- **`appVersionSource: "remote"`** — EAS tracks `versionCode` server-side, so you never
+  hand-bump it or collide with yourself.
+- **`version: ">= 21.7.0"`** — pins the CLI floor to what actually generated the file.
+
+`buildType: "apk"` keeps Android development builds as APK rather than AAB. Internal
+distribution already leans this way, but stating it removes the doubt — and an AAB cannot
+be sideloaded from a link, which is the whole of B1.
 
 ---
 
