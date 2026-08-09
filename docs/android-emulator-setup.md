@@ -5,12 +5,17 @@ This covers the emulator half of **B1**. The real-device half is the same APK �
 
 > ### ⚠️ Status: not yet walked end to end
 >
-> **Verified offline** (2026-08-08): the §5 `rsync` command, tested against a simulated
-> repo with its own `.git`; every fenced shell block, via `bash -n`; all package versions;
-> and the `arm64-v8a` image availability in §2, against Google's repository manifest.
+> **§1–§4 are done and verified on the real machine** (2026-08-08). The SDK is installed
+> via the Homebrew path, both AVDs exist, and **both images boot on the M2** — API 28
+> reports Android 9, API 36 reports Android 16, both `arm64-v8a`. Cold boot for API 36 was
+> about 90 seconds, headless.
 >
-> **Unverified — needs an installed SDK:** §1–§4, §6–§8, §10. No Android Studio, no SDK,
-> and no app exist on the machine yet.
+> **Verified offline:** the §5 `rsync` command, tested against a simulated repo with its
+> own `.git`; every fenced shell block, via `bash -n`; all package versions; and the
+> `arm64-v8a` image availability in §2, against Google's repository manifest.
+>
+> **Still unverified — needs the app to exist:** §5, §5a, §6–§8, §10. There is no
+> `package.json` and no `app.json` yet.
 >
 > Correct this file as you walk it. Delete this banner when §9 passes.
 
@@ -102,7 +107,23 @@ Android Studio also ships its own JBR 21 for Gradle's use.
 
 ## 2. SDK components
 
-Android Studio → **Settings → Languages & Frameworks → Android SDK**
+> ✅ **Done on this machine via the CLI, not Android Studio.** Android Studio was never
+> installed. The Homebrew path in §1 was used instead, and it worked. This is the exact
+> command that ran, and it took about 15 minutes for 8.7 GB:
+>
+> ```bash
+> yes | sdkmanager --install \
+>   "platform-tools" "emulator" "build-tools;36.0.0" \
+>   "platforms;android-36" "platforms;android-28" \
+>   "system-images;android-36;google_apis;arm64-v8a" \
+>   "system-images;android-28;google_apis;arm64-v8a"
+> ```
+>
+> `yes |` accepts the licence prompts. Installed and verified: `adb` 1.0.41, emulator
+> 37.1.11.0, `build-tools;36.0.0`, both platforms, both `arm64-v8a` images. `sdkmanager`
+> 22.0 ran fine on JDK 21.
+
+If you prefer the GUI: Android Studio → **Settings → Languages & Frameworks → Android SDK**
 
 **SDK Platforms** tab — check *Show Package Details*, then install:
 
@@ -131,19 +152,32 @@ the Google APIs image gives you a writable system and root `adb`.
 
 ## 3. Shell environment
 
-Add to `~/.zshrc`, then `source ~/.zshrc`:
+> ✅ **Already in `~/.zshrc` on this machine**, appended 2026-08-08. The original file was
+> backed up to `~/.zshrc.bak-before-android-20260808` first.
+
+**The SDK is not at `~/Library/Android/sdk`.** That is the Android Studio location.
+Homebrew's `android-commandlinetools` puts it here, and this is the verified path:
 
 ```bash
-export ANDROID_HOME="$HOME/Library/Android/sdk"
+export ANDROID_HOME="/opt/homebrew/share/android-commandlinetools"
+export ANDROID_SDK_ROOT="$ANDROID_HOME"
 export PATH="$PATH:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator"
+# Gradle reads JAVA_HOME for the local builds in §8
+export JAVA_HOME="$(/usr/libexec/java_home -v 21)"
 ```
 
-Verify:
+Then `source ~/.zshrc`. Verify:
 
 ```bash
 adb --version
 emulator -list-avds
 ```
+
+> ⚠️ **`~/.zshrc` loads for interactive shells only.** A script that runs `zsh -c` or
+> `bash -c` will not see these variables, so a check like `zsh -l -c 'echo $ANDROID_HOME'`
+> prints nothing even when the file is correct — `-l` is a login shell, not an interactive
+> one. Test with `zsh -i -c` instead. If you later need these in scripts, move the block to
+> `~/.zprofile`.
 
 ---
 
@@ -153,13 +187,21 @@ Android Studio → **More Actions → Virtual Device Manager → Create Virtual 
 
 **Make two.** They mirror the two real Android test devices:
 
-| AVD | Device profile | System image | Mirrors |
-|---|---|---|---|
-| `Pixel_6_API_36` | Pixel 6 or newer | API 36, `arm64-v8a` | Galaxy S23 — the comfortable case |
-| `S8_API_28` | Galaxy Nexus / Pixel (1080×1920) | API 28, `arm64-v8a` | **Galaxy S8 — the floor** |
+> ✅ **Both AVDs exist on this machine and both boot.** Created 2026-08-08. Verified from
+> inside each one: API 28 reports Android 9, API 36 reports Android 16, both `arm64-v8a`.
 
-For each: confirm the ABI column reads `arm64-v8a` before continuing. RAM default is
-fine; 16 GB host RAM makes this comfortable.
+| AVD | Device profile | System image | Mirrors | Resolution |
+|---|---|---|---|---|
+| `Pixel_6_API_36` | `pixel_6` | API 36, `arm64-v8a` | Galaxy S23 — the comfortable case | 1080×2400 |
+| `S8_API_28` | `pixel_3` | API 28, `arm64-v8a` | **Galaxy S8 — the floor** | 1080×2160 |
+
+`pixel_3` is the S8 stand-in for two reasons: its 18:9 ratio is the closest offered to the
+S8's 18.5:9, and the real Pixel 3 shipped on Android 9. No Galaxy profile exists in
+`avdmanager list device`. The screen is 1080 wide against the S8's 1440, so **check text
+size on the real phone, not here** — §5's large-type work is exactly where that matters.
+
+For each: confirm the ABI reads `arm64-v8a` before continuing. RAM default is fine; 16 GB
+host RAM makes this comfortable.
 
 Develop against API 36 because it is faster and the tooling complains less. **Check
 against API 28 before you believe anything works.** A layout or an API that is fine on
@@ -173,11 +215,37 @@ adb devices        # should list emulator-5554
 
 CLI equivalent, if you took the Homebrew path in §1:
 
+These are the commands that actually created them:
+
 ```bash
-avdmanager create avd -n S8_API_28 \
-  -k "system-images;android-28;google_apis;arm64-v8a" -d pixel
-emulator -avd S8_API_28 -no-snapshot-load &
+echo "no" | avdmanager create avd -n Pixel_6_API_36 \
+  -k "system-images;android-36;google_apis;arm64-v8a" -d pixel_6
+echo "no" | avdmanager create avd -n S8_API_28 \
+  -k "system-images;android-28;google_apis;arm64-v8a" -d pixel_3
 ```
+
+`echo "no" |` declines the custom-hardware-profile prompt.
+
+**Ignore the `devices.xml` errors.** Both commands print
+`Error: Could not load devices from .../system-images/.../devices.xml`, several times, and
+then succeed anyway. `avdmanager` looks for an optional file inside each system image and
+complains when it is absent. Check `emulator -list-avds` rather than trusting the exit
+noise.
+
+To boot one headless — no window, useful when you only need `adb`:
+
+```bash
+emulator -avd S8_API_28 -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect &
+adb -s emulator-5554 wait-for-device
+adb -s emulator-5554 shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 2; done'
+```
+
+Cold boot for API 36 measured about **90 seconds** headless on the M2. API 28 was faster.
+
+> ⚠️ **Always pass `-s emulator-PORT` when scripting.** A killed emulator lingers in
+> `adb devices` as `offline` for a few seconds, so a bare `adb wait-for-device` returns
+> immediately by matching the *dying* one, and the next command fails with
+> `adb: more than one device/emulator`. The first emulator takes 5554, the second 5556.
 
 ---
 
@@ -381,7 +449,7 @@ without having learned anything.
 
 ## 9. B1 acceptance
 
-B1 is done when all five hold:
+B1 is done when all six hold:
 
 - [ ] `minSdkVersion` is ≤ 28, so the S8 is a viable target (§5a)
 - [ ] Dev build installs and launches on both emulators — API 36 and API 28
@@ -487,7 +555,10 @@ only be settled on a real phone.
 | `adb: command not found` | `~/.zshrc` not sourced, or SDK is somewhere other than `~/Library/Android/sdk` |
 | Emulator very slow | Almost always an x86_64 image on ARM. Check the AVD's ABI |
 | Bundler can't reach the app | Use `npx expo start --dev-client`, not plain `expo start` — Expo Go can't load a dev build |
-| `SDK location not found` | `$ANDROID_HOME` unset or wrong — §3. Local builds also accept an `android/local.properties` with `sdk.dir=`, but fix the env var instead; `local.properties` is gitignored for a reason |
+| `SDK location not found` | `$ANDROID_HOME` unset or wrong — §3. On this machine it is `/opt/homebrew/share/android-commandlinetools`, **not** `~/Library/Android/sdk`. Local builds also accept an `android/local.properties` with `sdk.dir=`, but fix the env var instead; `local.properties` is gitignored for a reason |
+| `$ANDROID_HOME` empty in a script, but right in your terminal | `~/.zshrc` loads for interactive shells only. Test with `zsh -i -c`, not `zsh -l -c`. Move the block to `~/.zprofile` if scripts need it — §3 |
+| `avdmanager` prints `Could not load devices from .../devices.xml` | Harmless. The file is optional and absent from the system images. The AVD is still created — confirm with `emulator -list-avds` — §4 |
+| `adb: more than one device/emulator` right after killing one | The dead emulator lingers as `offline` for a few seconds. Target the port: `adb -s emulator-5556 …` — §4 |
 | `expo run:android` finds no device | Emulator must already be booted. `adb devices` first |
 | Gradle fails on a Java version | Point `JAVA_HOME` at JDK 21: `export JAVA_HOME=$(/usr/libexec/java_home -v 21)` |
 | Camera shows a living room, not a label | Working as designed — §10 |
