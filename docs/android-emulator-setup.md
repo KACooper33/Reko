@@ -14,8 +14,12 @@ This covers the emulator half of **B1**. The real-device half is the same APK �
 > own `.git`; every fenced shell block, via `bash -n`; all package versions; and the
 > `arm64-v8a` image availability in §2, against Google's repository manifest.
 >
-> **Still unverified — needs the app to exist:** §5, §5a, §6–§8, §10. There is no
-> `package.json` and no `app.json` yet.
+> **§5 and §5a are also done** (2026-08-08). The app exists: Expo SDK 57.0.11, React
+> Native 0.86.2, package `com.kacooper.reko`. **`minSdk` is 24, so the Galaxy S8 is a
+> viable target** — the gate passed. `npx tsc --noEmit` is clean.
+>
+> **Still unverified:** §6–§8 and §10. §6 and §7 need an `eas login`, and §9's real-device
+> half needs the phones.
 >
 > Correct this file as you walk it. Delete this banner when §9 passes.
 
@@ -272,12 +276,31 @@ rsync -av \
   --exclude 'node_modules/' \
   --exclude 'README.md' \
   --exclude '.gitignore' \
+  --exclude 'LICENSE' \
   ~/Git/reko-tmp/ ~/Git/Reko/
 
 cd ~/Git/Reko
 npm install                    # cheaper than rsyncing 100k files
 rm -rf ~/Git/reko-tmp
 ```
+
+> ⚠️ **`--exclude 'LICENSE'` is not optional.** The template ships Expo's own MIT licence:
+> *"Copyright (c) 2015-present 650 Industries, Inc. (aka Expo)"*. Copy it in and you have
+> silently put Expo's copyright on Reko and answered the README's "License: TBD" without
+> deciding anything. Verified present in the SDK 57 template on 2026-08-08.
+
+**Four other files the template now ships**, none of which the exclude list blocks. All
+four were kept deliberately here:
+
+| File | What it is | Verdict |
+|---|---|---|
+| `AGENTS.md` | Three lines: read the versioned Expo docs before writing code | Keep — accurate and useful |
+| `CLAUDE.md` | One line, `@AGENTS.md` | Keep. **Note it changes how future Claude sessions behave in this repo** |
+| `.claude/settings.json` | Enables the official Expo plugin | Keep. It does *not* collide with `settings.local.json` |
+| `assets/*.png` | Placeholder icons | Keep — the build needs an icon |
+
+`.claude/settings.local.json` holds local permission grants and is covered by the global
+`~/.gitignore_global`, so it stays out of the repo on its own.
 
 Then confirm the repo survived and that nothing unwanted is staged — `node_modules/` and
 `.expo/` should not appear, because `.gitignore` already covers them:
@@ -309,12 +332,31 @@ thing B1 is trying to isolate.
 else.** The Galaxy S8's final OS is Android 9 (API 28). If Expo's minimum is above 28,
 the S8 cannot run Reko at all, and D6 needs rewriting.
 
-Expo sets `minSdkVersion` from a Gradle plugin, not from a file you can read in the
-published package — so it cannot be checked ahead of the scaffold. After §5:
+> ## ✅ ANSWERED: `minSdk` is **24**. The S8 is in, with four levels of margin.
+>
+> Checked 2026-08-08 against Expo SDK 57.0.11 / React Native 0.86.2. Two independent
+> sources agree:
+>
+> - `ExpoRootProjectPlugin.kt` — `setIfNotExist("minSdkVersion") { … ?: "24" }`
+> - `node_modules/react-native/gradle/libs.versions.toml` — `minSdk = "24"`
+>
+> Read from source, not yet from Gradle's own output. The first local build (§8) prints an
+> authoritative `[ExpoRootProject] Using the following versions:` block — confirm there.
+
+**Do not grep `android/build.gradle` for this.** It is not there. `android/app/build.gradle`
+says `minSdkVersion rootProject.ext.minSdkVersion`, and that `ext` is populated at
+configuration time by the `expo-root-project` plugin, which reads a version catalog and
+falls back to hardcoded defaults. The real values live in two places:
 
 ```bash
 npx expo prebuild -p android
-grep -rE 'minSdkVersion|minSdk' android/build.gradle android/gradle.properties
+
+# The plugin's fallbacks:
+grep -nE 'minSdk|compileSdk|targetSdk' \
+  node_modules/expo-modules-autolinking/android/expo-gradle-plugin/expo-autolinking-plugin/src/main/kotlin/expo/modules/plugin/ExpoRootProjectPlugin.kt
+
+# The catalog that overrides them:
+sed -n '1,10p' node_modules/react-native/gradle/libs.versions.toml
 ```
 
 Read the number:
@@ -323,6 +365,23 @@ Read the number:
 |---|---|
 | **≤ 28** | The S8 is in. Proceed |
 | **> 28** | **Stop.** The S8 cannot run v1. Record it in `TASKS.md`, revisit D6, and decide whether to pin an older Expo SDK or drop the device |
+
+### What else that catalog decides
+
+Check these at the same time — they tell you which SDK packages §2 actually needed:
+
+| Value | SDK 57 / RN 0.86.2 | Installed in §2? |
+|---|---|---|
+| `compileSdk` / `targetSdk` | 36 | ✅ `platforms;android-36` |
+| `buildTools` | 36.0.0 | ✅ `build-tools;36.0.0` |
+| `ndkVersion` | 27.1.12297006 | ❌ **not installed** |
+
+The NDK is absent on this machine. A stock Expo build with no custom native code usually
+does not need it. **If §8 fails asking for NDK 27.1.12297006**, install it and re-run:
+
+```bash
+sdkmanager --install "ndk;27.1.12297006"
+```
 
 `react-native-vision-camera` inherits this value from the app rather than setting its
 own, so re-run this check when you add it at B2. A camera library is exactly the kind of
