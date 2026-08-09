@@ -20,6 +20,11 @@ Last updated: 2026-08-07
 | D9 | Name | **Reko** |
 | D10 | Dev/preview bundle ID | TBD — decide whether `com.kacooper.reko.dev` gets its own profile |
 
+**Accounts and identifiers**
+
+- **EAS project exists** — created 2026-08-08, linked to GitHub. Project ID `6b9e55ce-906f-4931-951e-617e74c761e8`. Link with `eas init --id <that>`; plain `eas init` would create a second project. It belongs in `app.json` under `extra.eas.projectId` and is **committed, not a secret** — see `docs/android-emulator-setup.md` §6
+- **The shipped app holds no secrets.** That follows from D7 (build-time model only) and local-first. The only two secrets in this project are the UMLS UTS API key (A1) and any model key (A8). Both stay on the laptop in `.env`, which `.gitignore` covers. EAS holds the Android signing key
+
 ### D9 rationale — why Reko
 
 Nine candidates tested against App Store collision risk. Seven had strikes:
@@ -55,6 +60,12 @@ Two notes for anyone revisiting this:
 
 **This is the long pole and it is not blocked by anything.**
 
+> **A1 and C1 are the only two items that wait on someone else.** A1 waits on UMLS
+> approval, which is not instant, and it gates A2 → A3 → A4 → B3c — the longest chain in
+> the project. C1 waits on a person to react to a printed card, and it can show the idea
+> does not work before any code exists. **Start both today.** Everything else on this list
+> waits only on you.
+
 - [ ] **A1.** Create UMLS account, accept Metathesaurus license, get UTS API key ← *most time-sensitive item on this list; approval is not instant*
 - [ ] **A2.** Download RxNorm full monthly release (RRF)
 - [ ] **A3.** Prune to SQLite: ingredients (IN/PIN), brand names (BN), and the relationships between them. Record final file size
@@ -77,9 +88,9 @@ Two notes for anyone revisiting this:
 - [ ] **B2.** Camera capture → OCR → dump raw text on screen, unstyled
 - [ ] **B3a.** Locate the "Active ingredient(s)" section boundary within the OCR output
 - [ ] **B3b.** Extract candidate ingredient strings + strengths from that section
-- [ ] **B3c.** Fuzzy-match candidates against RxNorm, handling OCR noise
+- [ ] **B3c.** Fuzzy-match candidates against RxNorm, handling OCR noise — **⚠️ this is the real merge point with Track A.** Blocked by A3 (the SQLite) and A4 (the FTS index). Track B stops here until Track A delivers
 - [ ] **B3d.** **Confirmation screen** — show what was found, let the user correct it. Never trust the scan silently (§3)
-- [ ] **B4.** Ship the SQLite as a bundled asset; wire lookup → brand bridge *(merge point with Track A)*
+- [ ] **B4.** Ship the SQLite as a bundled asset; wire lookup → brand bridge. *Previously labelled the merge point — it is not. The tracks meet at B3c; B4 is only where the database ships inside the app.* Brand bridge quality depends on A6
 - [ ] **B5.** Large type + TTS + source attribution line. **A stage, not polish** — §4 calls these core features
 
 ---
@@ -90,6 +101,9 @@ Two notes for anyone revisiting this:
 - [ ] **C2.** Medicine-cabinet survey — read every Drug Facts panel, OTC included
 - [ ] **C3.** Confirm duplicates actually exist in a real household
 - [ ] **C4.** **Golden test set** — freeze ~20 real label photos + hand-written correct answers. Include curved bottles, glare, worn print, two-column panels
+  - **⚠️ Do this BEFORE B3a, not after.** C4 is not a test that follows the parser; it is the instrument you build the parser with. Without known answers you cannot tell whether a change to B3a–c helped or hurt
+  - Shoot the photos on the **S8** (C5). It is the worst realistic capture; the S23 flatters the parser
+  - It also removes the camera from the loop — a file-based input path lets B3a–c run with no device at all. See `docs/android-emulator-setup.md` §10
 - [x] **C5.** Confirm what phones the 3 test devices actually are. If target users are on iPhone, D3 needs revisiting sooner
   - **Answered 2026-08-08: Galaxy S8, Galaxy S23, iPhone 17.**
   - **D3 holds.** The iPhone cannot run v1 and EAS iOS distribution needs the $99 program. But C1 is a printed card — no app, no phone — so that user joins the most valuable test at full strength. Decide iOS after C1. The `v1.5` milestone already exists for it
