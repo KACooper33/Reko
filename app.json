@@ -21,6 +21,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "6b9e55ce-906f-4931-951e-617e74c761e8"
+      }
+    },
+    "owner": "kacooper"
   }
 }
