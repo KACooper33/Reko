@@ -71,7 +71,8 @@ Two notes for anyone revisiting this:
 
 ## Track B — App
 
-- [ ] **B0.** Repo scaffolding: README (including §5 non-goals stated explicitly), `.gitignore` (`node_modules/`, `.expo/`, `ios/`, `android/`, `*.jks`, `.env`), labels, milestones
+- [x] **B0.** Repo scaffolding: README (including §5 non-goals stated explicitly), `.gitignore` (`node_modules/`, `.expo/`, `ios/`, `android/`, `*.jks`, `.env`), labels, milestones
+  - Labels and milestones are live — `./setup-repo.sh` run 2026-08-07. 8 labels (`agent`, `human`, 3 track, `decision`, `blocked`, `guardrail`), 5 milestones (`v1`, `v1.5`, `v2`, `v3`, `v4`). Script is idempotent; re-run after editing it
 - [ ] **B1.** Expo dev build installs on a real Android device via EAS internal distribution. Camera icon present, disabled. *Proves the whole distribution chain before any feature exists*
 - [ ] **B2.** Camera capture → OCR → dump raw text on screen, unstyled
 - [ ] **B3a.** Locate the "Active ingredient(s)" section boundary within the OCR output
