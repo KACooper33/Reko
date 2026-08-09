@@ -264,11 +264,31 @@ dependency that raises a floor.
 
 ## 6. Configure EAS
 
+The Expo project **already exists** — created 2026-08-08, linked to GitHub. So link to it;
+do not create a second one.
+
 ```bash
 npm install -g eas-cli
-eas login                      # free Expo account
-eas init                       # links the project, writes the projectId
-eas build:configure -p android # writes eas.json
+eas login
+eas init --id 6b9e55ce-906f-4931-951e-617e74c761e8   # link the EXISTING project
+eas project:info                                     # confirm it linked to Reko
+eas build:configure -p android                       # writes eas.json
+```
+
+> **Use `--id`.** Plain `eas init` *creates* a project. Run it against an account that
+> already has one and you get two, then build against the wrong one and wonder why the
+> install link is stale.
+
+`eas init --id` writes the value into `app.json` under `extra.eas.projectId`. **Commit it.**
+It is not a secret — Expo publishes it, it appears in build URLs, and EAS's own servers
+need to read it from the repo. Do not move it to an environment variable; a clean checkout
+must be able to build.
+
+If `eas project:info` reports an account name different from your login, add the owner to
+`app.json` or builds will fail to resolve the project:
+
+```json
+{ "expo": { "owner": "<expo-account-name>" } }
 ```
 
 Edit `eas.json` so the development profile produces an APK:
