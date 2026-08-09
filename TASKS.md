@@ -11,10 +11,10 @@ Last updated: 2026-08-07
 |---|---|---|
 | D1 | Stack | Expo dev build + `expo-ocr-kit` (Vision on iOS / ML Kit on Android), EAS Build |
 | D2 | Bundle ID / package | `com.kacooper.reko` |
-| D3 | Platform for v1 testing | **Android only.** Apple Developer Program deferred until after paper test |
+| D3 | Platform for v1 testing | **Android only — holds.** Apple Developer Program deferred until after paper test. See C5: one of the three test devices is an iPhone 17, so this is now a known cost, not an assumption |
 | D4 | v1 scope | **OTC only.** v2 = OTC + bundling, v3 = expanded OTC, v4 = Rx |
 | D5 | Ingredient scope for v1 | **Top 100 actives.** Expand in v3 |
-| D6 | Test devices | 3 to start |
+| D6 | Test devices | 3 identified — Galaxy S8, Galaxy S23, iPhone 17. **Two can run v1**, per D3. The S8 sets the floor at API 28 and is the primary B1 target |
 | D7 | LLM placement | **Build time only.** No model call at runtime; every shipped string human-reviewed |
 | D8 | Plain-language source | **DailyMed SPL.** MedlinePlus is link-out only — AHFS content may not be ingested |
 | D9 | Name | **Reko** |
@@ -90,7 +90,12 @@ Two notes for anyone revisiting this:
 - [ ] **C2.** Medicine-cabinet survey — read every Drug Facts panel, OTC included
 - [ ] **C3.** Confirm duplicates actually exist in a real household
 - [ ] **C4.** **Golden test set** — freeze ~20 real label photos + hand-written correct answers. Include curved bottles, glare, worn print, two-column panels
-- [ ] **C5.** Confirm what phones the 3 test devices actually are. If target users are on iPhone, D3 needs revisiting sooner
+- [x] **C5.** Confirm what phones the 3 test devices actually are. If target users are on iPhone, D3 needs revisiting sooner
+  - **Answered 2026-08-08: Galaxy S8, Galaxy S23, iPhone 17.**
+  - **D3 holds.** The iPhone cannot run v1 and EAS iOS distribution needs the $99 program. But C1 is a printed card — no app, no phone — so that user joins the most valuable test at full strength. Decide iOS after C1. The `v1.5` milestone already exists for it
+  - **The S8 is the constraint and the priority.** Its final OS is Android 9 (API 28), unsupported since ~2021. That is the v1 floor. Reko serves older adults, and older adults keep old phones — the S8 is what the real user holds, so it leads B1 and B2, not the S23
+  - **C4 consequence:** the golden set must include photos shot on the S8. It is the worst realistic capture; the S23 camera will flatter the parser
+  - **Open risk:** Expo SDK 57's `minSdkVersion` is set by a Gradle plugin and could not be read from the published package. If the floor is above API 28, the S8 is out and D6 changes. Settle it right after the scaffold — see `docs/android-emulator-setup.md` §5
 
 ---
 
