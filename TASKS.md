@@ -85,6 +85,9 @@ Two notes for anyone revisiting this:
 - [x] **B0.** Repo scaffolding: README (including §5 non-goals stated explicitly), `.gitignore` (`node_modules/`, `.expo/`, `ios/`, `android/`, `*.jks`, `.env`), labels, milestones
   - Labels and milestones are live — `./setup-repo.sh` run 2026-08-07. 8 labels (`agent`, `human`, 3 track, `decision`, `blocked`, `guardrail`), 5 milestones (`v1`, `v1.5`, `v2`, `v3`, `v4`). Script is idempotent; re-run after editing it
 - [ ] **B1.** Expo dev build installs on a real Android device via EAS internal distribution. Camera icon present, disabled. *Proves the whole distribution chain before any feature exists*
+  - **Done (2026-08-08):** Android SDK installed; two AVDs built and booted (API 36 → Android 16, API 28 → Android 9, both `arm64-v8a`); app scaffolded on Expo SDK 57.0.11 / RN 0.86.2 as `com.kacooper.reko`; `minSdk` confirmed at 24; the disabled-camera screen written and typechecking clean
+  - **Left:** `eas login` → `eas init --id` → cloud build → install on the **S8 first**, then the S23 → write up what the S8 install actually took. Steps and acceptance in `docs/android-emulator-setup.md` §6–§9
+  - The write-up is the deliverable, not the build
 - [ ] **B2.** Camera capture → OCR → dump raw text on screen, unstyled
 - [ ] **B3a.** Locate the "Active ingredient(s)" section boundary within the OCR output
 - [ ] **B3b.** Extract candidate ingredient strings + strengths from that section
@@ -109,7 +112,7 @@ Two notes for anyone revisiting this:
   - **D3 holds.** The iPhone cannot run v1 and EAS iOS distribution needs the $99 program. But C1 is a printed card — no app, no phone — so that user joins the most valuable test at full strength. Decide iOS after C1. The `v1.5` milestone already exists for it
   - **The S8 is the constraint and the priority.** Its final OS is Android 9 (API 28), unsupported since ~2021. That is the v1 floor. Reko serves older adults, and older adults keep old phones — the S8 is what the real user holds, so it leads B1 and B2, not the S23
   - **C4 consequence:** the golden set must include photos shot on the S8. It is the worst realistic capture; the S23 camera will flatter the parser
-  - **Open risk:** Expo SDK 57's `minSdkVersion` is set by a Gradle plugin and could not be read from the published package. If the floor is above API 28, the S8 is out and D6 changes. Settle it right after the scaffold — see `docs/android-emulator-setup.md` §5
+  - **~~Open risk~~ — RESOLVED 2026-08-08: `minSdk` is 24, so the S8 is a viable target** with four levels of margin. Confirmed against Expo SDK 57.0.11 / RN 0.86.2 from two independent sources (the `expo-root-project` plugin default and React Native's `libs.versions.toml`). D6 stands as written. Re-check when `react-native-vision-camera` lands at B2 — it inherits the floor rather than setting one, so a camera library is exactly what could raise it
 
 ---
 
