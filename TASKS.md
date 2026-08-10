@@ -9,7 +9,7 @@ Last updated: 2026-08-07
 
 | # | Decision | Value |
 |---|---|---|
-| D1 | Stack | Expo dev build + `expo-ocr-kit` (Vision on iOS / ML Kit on Android), EAS Build |
+| D1 | Stack | Expo dev build + `expo-ocr-kit` (Vision on iOS / ML Kit on Android), EAS Build. **Camera is `expo-camera`, not `react-native-vision-camera`** — see below |
 | D2 | Bundle ID / package | `com.kacooper.reko` |
 | D3 | Platform for v1 testing | **Android only — holds.** Apple Developer Program deferred until after paper test. See C5: one of the three test devices is an iPhone 17, so this is now a known cost, not an assumption |
 | D4 | v1 scope | **OTC only.** v2 = OTC + bundling, v3 = expanded OTC, v4 = Rx |
@@ -19,6 +19,18 @@ Last updated: 2026-08-07
 | D8 | Plain-language source | **DailyMed SPL.** MedlinePlus is link-out only — AHFS content may not be ingested |
 | D9 | Name | **Reko** |
 | D10 | Dev/preview bundle ID | TBD — decide whether `com.kacooper.reko.dev` gets its own profile |
+
+### D1 amendment — `expo-camera`, and why vision-camera waits
+
+Decided 2026-08-09. The README stack table said `react-native-vision-camera`. v1 uses **`expo-camera`** instead.
+
+The question that prompted this was a good one: **on a curved bottle the ingredients line can wrap past what one photo holds.** Vision-camera's frame processors are the obvious tool for accumulating text across a rotation. Three things argue against reaching for it now:
+
+- **`expo-ocr-kit` is image-based, not a vision-camera frame-processor plugin.** Its peer dependencies are only `expo`, `react`, and `react-native`. Live OCR is therefore not two packages clicking together — it needs native glue, which *is* the custom Expo Module already listed as an open question. That question says to decide after B2 and C4 give a measured number, and that discipline should hold.
+- **Reko's flow is a still photo, not live scanning** — capture, confirm, explain. Multiple stills merged into a union solves the wrap case, and B3d confirms the result regardless. The product never trusts a scan silently, so a missed line is a correctable gap rather than a wrong answer.
+- **Vision-camera 5.x pulls in `react-native-nitro-modules` and `react-native-nitro-image`.** Three native dependencies where one will do, on a project whose floor is a nine-year-old phone. Each one can raise `minSdkVersion` above 28 and cost the S8.
+
+Vision-camera stays in reserve, the way Scrivo is held for v4. If C4 measures stills as insufficient on curved bottles, that is the evidence to adopt it — not a guess made in advance.
 
 **Accounts and identifiers**
 
@@ -98,6 +110,11 @@ Two notes for anyone revisiting this:
   - **Left:** `eas login` → `eas init --id` → cloud build → install on the **S8 first**, then the S23 → write up what the S8 install actually took. Steps and acceptance in `docs/android-emulator-setup.md` §6–§9
   - The write-up is the deliverable, not the build
 - [ ] **B2.** Camera capture → OCR → dump raw text on screen, unstyled
+  - **B2a. Prove the OCR on a still image first — no camera.** Add `expo-ocr-kit`, bundle one photo of a Drug Facts panel, run OCR on the file, print what comes back. If the module is broken on SDK 57 you learn it in an hour with no camera UI written. It also builds the file-based input seam that C4 needs. Do this before B2b
+  - **B2b. Capture with `expo-camera`, not `react-native-vision-camera`** — see the D1 note below
+  - **B2c. Multiple stills, merged.** The user turns the bottle and takes two or three photos; OCR each; take the union of the candidates. This is how the curved-bottle wrap gets solved without live frame processing, and B3d confirms the result anyway
+  - Re-run the §5a `minSdk` check after any native module lands. 28 is the S8's ceiling
+  - Iterate with `npx expo run:android --device` over USB, ~1 min per rebuild. EAS is 10–20 min and would waste the day. Native changes still need an EAS build before they reach a phone by link
 - [ ] **B3a.** Locate the "Active ingredient(s)" section boundary within the OCR output
 - [ ] **B3b.** Extract candidate ingredient strings + strengths from that section
 - [ ] **B3c.** Fuzzy-match candidates against RxNorm, handling OCR noise — **⚠️ this is the real merge point with Track A.** Blocked by A3 (the SQLite) and A4 (the FTS index). Track B stops here until Track A delivers
@@ -112,10 +129,14 @@ Two notes for anyone revisiting this:
 - [ ] **C1.** **The paper test.** Printed card for Tylenol PM, Benadryl connection spelled out. Watch the reaction (§9). *No app required — do this before spending $99 on Apple*
 - [ ] **C2.** Medicine-cabinet survey — read every Drug Facts panel, OTC included
 - [ ] **C3.** Confirm duplicates actually exist in a real household
-- [ ] **C4.** **Golden test set** — freeze ~20 real label photos + hand-written correct answers. Include curved bottles, glare, worn print, two-column panels
+- [ ] **C4.** **Golden test set** — freeze ~20 **products**, each with **one or more frames**, plus hand-written correct answers. Include curved bottles, glare, worn print, two-column panels
   - **⚠️ Do this BEFORE B3a, not after.** C4 is not a test that follows the parser; it is the instrument you build the parser with. Without known answers you cannot tell whether a change to B3a–c helped or hurt
-  - Shoot the photos on the **S8** (C5). It is the worst realistic capture; the S23 flatters the parser
+  - Shoot on the **S8** (C5). It is the worst realistic capture; the S23 flatters the parser
   - It also removes the camera from the loop — a file-based input path lets B3a–c run with no device at all. See `docs/android-emulator-setup.md` §10
+  - **The unit is the frame set, not the photo.** On a cylinder the ingredients line can wrap past what one frame holds, so for some products the answer needs two frames together
+  - **Include several small bottles where no single frame holds the whole ingredients line** — eye drops, children's liquids, 100-count tablets. If that case is absent from the set, you will never measure it
+  - **Shoot video, then freeze frames.** One slow rotation captures every angle in seconds. But a fixture must be deterministic: video forces every test run to re-choose frames, and then a parser change cannot be told apart from a framing change. Extract the frames, commit those, keep the video beside them as provenance
+  - Test the **UPC barcode** on the same bottles while you are there. See open questions
 - [x] **C5.** Confirm what phones the 3 test devices actually are. If target users are on iPhone, D3 needs revisiting sooner
   - **Answered 2026-08-08: Galaxy S8, Galaxy S23, iPhone 17.**
   - **D3 holds.** The iPhone cannot run v1 and EAS iOS distribution needs the $99 program. But C1 is a printed card — no app, no phone — so that user joins the most valuable test at full strength. Decide iOS after C1. The `v1.5` milestone already exists for it
@@ -123,7 +144,7 @@ Two notes for anyone revisiting this:
   - **C4 consequence:** the golden set must include photos shot on the S8. It is the worst realistic capture; the S23 camera will flatter the parser
   - **2026-08-09 — the S8 could not install anything.** It was logged into a minor's account, which is barred from installing unknown apps; the toggle is absent rather than off. Factory reset planned. Real test devices carry real account baggage, and a tester whose phone is managed by a family member cannot sideload at all
   - The S23 installed fine once its warnings were dismissed. **Owner's call: those warnings are the ordinary cost of installing from the internet rather than a store, and are not a product concern.** The S8's block was different in kind — a refusal, not a warning
-  - **~~Open risk~~ — RESOLVED 2026-08-08: `minSdk` is 24, so the S8 is a viable target** with four levels of margin. Confirmed against Expo SDK 57.0.11 / RN 0.86.2 from two independent sources (the `expo-root-project` plugin default and React Native's `libs.versions.toml`). D6 stands as written. Re-check when `react-native-vision-camera` lands at B2 — it inherits the floor rather than setting one, so a camera library is exactly what could raise it
+  - **~~Open risk~~ — RESOLVED 2026-08-08: `minSdk` is 24, so the S8 is a viable target** with four levels of margin. Confirmed against Expo SDK 57.0.11 / RN 0.86.2 from two independent sources (the `expo-root-project` plugin default and React Native's `libs.versions.toml`). D6 stands as written. Re-check when `expo-camera` and `expo-ocr-kit` land at B2 — both add native code, and a camera or ML library is exactly the kind of dependency that raises a floor
 
 ---
 
@@ -143,7 +164,7 @@ Two notes for anyone revisiting this:
 - **Google Play internal testing track — $25 once. Worth costing, not yet decided.** Testers install from the Play Store, so no unknown-sources toggle and no Play Protect prompt. The case for it is not the warnings — those are dismissible, and the owner has judged them a non-issue (C5). The case is the **restricted-device problem**: the S8 could not install at all on a minor's account, and a tester on a family-managed phone hits the same wall. Sideloading also cannot reach them. Revisit after C1, alongside the deferred $99 Apple decision — a store path costs a quarter of it and removes a hard block rather than a nuisance
 - D10: separate `.dev` bundle ID for preview builds?
 - Does `expo-ocr-kit` hold up under real use, or does this become a custom Expo Module? *(Decide after B2 + C4 give a measured number)*
-- UPC barcode → NDC lookup as an OCR alternative — still untested (§10)
+- **UPC barcode → NDC lookup as an OCR alternative — still untested (§10). Curved bottles are the strongest argument for it.** A barcode is small, sits on a flat-enough patch, and is designed to be read by a machine, so it sidesteps the wrap problem entirely for any product carrying one. Test it on the same bottles during B2 and C4. **If a barcode resolves a product that OCR could not read, that is a significant finding** — and it would reopen how much OCR accuracy v1 actually needs
 
 ---
 

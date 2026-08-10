@@ -64,7 +64,9 @@ the Android side is not installed at all.
 script. §5 is where the app starts existing, and it is the step with the sharp edge.
 
 Current versions, if you want to pin rather than float: `expo` 57.0.11, `eas-cli`
-21.7.0, `react-native-vision-camera` 5.2.2, `expo-ocr-kit` **0.1.4**.
+21.7.0, `expo-ocr-kit` **0.1.4**. Camera is `expo-camera`, versioned with the SDK —
+`react-native-vision-camera` 5.2.2 exists but is **not** the v1 choice, per the D1
+amendment in `TASKS.md`.
 
 > That `0.1.4` deserves a look. D1 rests on `expo-ocr-kit`, and a pre-1.0 version number
 > is consistent with the open question already in `TASKS.md` — whether it holds up or
@@ -328,10 +330,9 @@ Then set the package name in `app.json`, per D2:
 }
 ```
 
-**Do not install `expo-ocr-kit` or `react-native-vision-camera` yet.** B1 is a
-distribution test, not a feature. Adding native camera deps now means a build failure
-can't be cleanly attributed to the pipeline vs. the dependency — which is the whole
-thing B1 is trying to isolate.
+**Do not install `expo-ocr-kit` or `expo-camera` yet.** B1 is a distribution test, not a
+feature. Adding native camera deps now means a build failure can't be cleanly attributed
+to the pipeline vs. the dependency — which is the whole thing B1 is trying to isolate.
 
 ### 5a. Check the Android floor — do this immediately
 
@@ -390,9 +391,14 @@ does not need it. **If §8 fails asking for NDK 27.1.12297006**, install it and 
 sdkmanager --install "ndk;27.1.12297006"
 ```
 
-`react-native-vision-camera` inherits this value from the app rather than setting its
-own, so re-run this check when you add it at B2. A camera library is exactly the kind of
-dependency that raises a floor.
+**Re-run this check after any native module lands at B2** — `expo-camera` and
+`expo-ocr-kit` both add native code, and a camera or ML library is exactly the kind of
+dependency that raises a floor. 28 is the S8's ceiling, so a jump past it costs your
+primary test device.
+
+This is one of the reasons `react-native-vision-camera` is not the v1 choice: version 5.x
+pulls in `react-native-nitro-modules` and `react-native-nitro-image` as well, so it is
+three chances to raise the floor instead of one. See the D1 amendment in `TASKS.md`.
 
 ---
 
