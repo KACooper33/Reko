@@ -62,7 +62,7 @@ Two reasons, and both matter:
 |---|---|
 | Framework | Expo (dev build — not Expo Go) |
 | OCR | `expo-ocr-kit` — Apple Vision on iOS, ML Kit on Android |
-| Camera | react-native-vision-camera |
+| Camera | expo-camera — still capture, not live frame processing. See the D1 amendment in `TASKS.md` |
 | Local DB | expo-sqlite, prepopulated asset |
 | Speech | expo-speech |
 | Build & distribution | EAS Build, internal distribution |
