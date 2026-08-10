@@ -18,8 +18,15 @@ This covers the emulator half of **B1**. The real-device half is the same APK �
 > Native 0.86.2, package `com.kacooper.reko`. **`minSdk` is 24, so the Galaxy S8 is a
 > viable target** — the gate passed. `npx tsc --noEmit` is clean.
 >
-> **Still unverified:** §6–§8 and §10. §6 and §7 need an `eas login`, and §9's real-device
-> half needs the phones.
+> **§6 and §7 are done** (2026-08-09). The project is linked as `@kacooper/reko`, `eas.json`
+> is committed, and a **`preview` build finished and installs**. Verified on the Galaxy S23
+> from the EAS link, and on both emulators by `adb install`. The screen renders identically
+> on Android 9 and Android 16 — no layout break at the floor.
+>
+> **Still unverified:** §8 (no local `expo run:android` yet) and §10 (camera passthrough
+> untested).
+>
+> **§9 stands at 4 of 6.** Both remaining rows need the S8, which is blocked — see §9.
 >
 > Correct this file as you walk it. Delete this banner when §9 passes.
 
@@ -536,24 +543,64 @@ without having learned anything.
 
 ## 9. B1 acceptance
 
-B1 is done when all six hold:
+B1 is done when all six hold. **Status 2026-08-09: 4 of 6.**
 
-- [ ] `minSdkVersion` is ≤ 28, so the S8 is a viable target (§5a)
-- [ ] Dev build installs and launches on both emulators — API 36 and API 28
-- [ ] Dev build installs and launches on the **Galaxy S8** via the EAS link
-- [ ] Dev build installs and launches on the **Galaxy S23** via the EAS link
-- [ ] A camera icon is visible and visibly disabled
-- [ ] You've written down what the install flow looked like **on the S8** — how many
-      taps, what the warnings said, whether you'd talk a 78-year-old through it
+- [x] `minSdkVersion` is ≤ 28, so the S8 is a viable target (§5a) — **24**, read from the
+      built APK with `apkanalyzer manifest min-sdk`, not just from source
+- [x] Build installs and launches on both emulators — API 36 and API 28. Installed with
+      `adb install`, so this proves the app *runs* at both API levels. It does **not** test
+      distribution; only a real phone does that
+- [ ] Build installs and launches on the **Galaxy S8** via the EAS link — **blocked**, see
+      below
+- [x] Build installs and launches on the **Galaxy S23** via the EAS link
+- [x] A camera icon is visible and visibly disabled — confirmed on the S23 and both
+      emulators
+- [ ] You've written down what the install flow looked like **on the S8** — **blocked**
 
-**Do the S8 before the S23.** Android 9's sideload flow is the oldest and the most
-confusing: "install unknown apps" is a per-source permission buried in Settings, and the
-warnings differ from what a modern phone shows. The S23 will make the process look easier
-than it is.
+### Build the `preview` profile, not `development`
 
-That last checkbox is the actual deliverable. The build working is assumed; the question
-B1 answers is whether the distribution path is walkable by the people who'll test it —
-on the oldest phone in the set, not the newest.
+The original wording said "dev build". That is wrong for this purpose, and it cost a
+false start.
+
+A `development` build carries no JavaScript. It fetches the bundle from Metro on your Mac,
+so on a phone it opens the dev-client launcher asking for a development server — not Reko.
+No tester will run Metro.
+
+```bash
+eas build --platform android --profile preview
+```
+
+`preview` bundles the JS and runs standalone. Install behaviour is identical between the
+two profiles, so observations about taps and warnings hold either way. Use `development`
+later, for the B2 iteration loop where fast reload matters.
+
+### The S8 is blocked, and the reason is the finding
+
+The S8 was logged into a **minor's account**, which cannot install unknown apps. The
+*Install unknown apps* toggle is absent or greyed out rather than merely off — this is a
+hard block, not a warning to dismiss. A factory reset is planned.
+
+Record this as a distribution result, not a detour. **A tester whose phone is managed by a
+family member cannot sideload at all**, and no amount of instruction changes that.
+
+### On the S23's warnings
+
+The S23 installed once the warnings were dismissed. Owner's assessment, recorded as the
+call: **these are the ordinary consequence of installing an app from the internet rather
+than a store, and are not a product concern.** Reasonable — they are standard, expected,
+and dismissible by a competent adult.
+
+What survives that judgement is the paragraph above. The S8's block was categorically
+different: not a warning, but a refusal.
+
+### Still the deliverable
+
+The last checkbox. The build working is assumed; the question B1 answers is whether the
+distribution path is walkable by the people who'll test it — on the oldest phone in the
+set, not the newest.
+
+**Do the S8 before the S23** when the reset is done. Android 9's sideload flow is the
+oldest and the most confusing.
 
 The iPhone 17 is not part of B1. Per D3 it cannot run v1, and EAS iOS distribution needs
 the $99 Apple Developer Program. That user joins at C1 instead, which is a printed card
@@ -652,3 +699,7 @@ only be settled on a real phone.
 | Play Protect: "Unsafe app blocked" on a real phone | Expected for internal distribution. Don't paper over it — how many taps this costs is a **B1 deliverable** (§9) |
 | Inexplicable bundler or native-resolution failure | Node 26 is Current, not LTS. Drop to Node 22/24 before debugging further — see Preflight |
 | `git status` shows a huge diff after §5 | The `.git/` clobber. `git remote -v` and `git log` will look wrong too. Restore from `origin` — nothing local is unpushed |
+| Phone shows the dev-client launcher, not Reko | You built `development`, which carries no JS. Build `preview`, or run `npx expo start --dev-client` on the Mac — §9 |
+| *Install unknown apps* is greyed out or missing entirely | The account is a minor's, supervised, or otherwise restricted. This is a hard block, not a setting you can flip. Switch to the owner user, or reset the device — §9 |
+| `adb shell monkey -p <pkg>` installs but never launches | Happened here: `monkey` reported success and left the home screen up. Use `adb shell am start -W -n <pkg>/.MainActivity`, resolving the activity with `cmd package resolve-activity --brief` |
+| `aapt2 dump badging` prints no `sdkVersion` line | Use `apkanalyzer manifest min-sdk <apk>` instead. It returns the number alone, and it is the authoritative read of a built APK |
