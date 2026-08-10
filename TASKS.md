@@ -87,7 +87,13 @@ Two notes for anyone revisiting this:
 
 - [x] **B0.** Repo scaffolding: README (including §5 non-goals stated explicitly), `.gitignore` (`node_modules/`, `.expo/`, `ios/`, `android/`, `*.jks`, `.env`), labels, milestones
   - Labels and milestones are live — `./setup-repo.sh` run 2026-08-07. 8 labels (`agent`, `human`, 3 track, `decision`, `blocked`, `guardrail`), 5 milestones (`v1`, `v1.5`, `v2`, `v3`, `v4`). Script is idempotent; re-run after editing it
-- [ ] **B1.** Expo dev build installs on a real Android device via EAS internal distribution. Camera icon present, disabled. *Proves the whole distribution chain before any feature exists*
+- [ ] **B1.** Expo dev build installs on a real Android device via EAS internal distribution. Camera icon present, disabled. *Proves the whole distribution chain before any feature exists* — **4 of 6 as of 2026-08-09**, see `docs/android-emulator-setup.md` §9
+  - ✅ `minSdk` is **24**, read from the built APK. The S8 is a viable target
+  - ✅ Installs and launches on the **Galaxy S23** from the EAS link. Wordmark, disabled camera control, "Not available yet" all render
+  - ✅ Runs on both emulators, API 36 and API 28. **Identical rendering on Android 9 and Android 16** — no layout break at the floor. Installed by `adb install`, so this proves the app runs, not that distribution works
+  - ⛔ **S8 blocked.** The device was on a minor's account, which cannot install unknown apps — the toggle is absent, not merely off. Factory reset planned
+  - ⛔ The S8 install write-up, which is the actual deliverable
+  - **Build the `preview` profile, not `development`.** A `development` build has no JS inside it and opens the dev-client launcher unless Metro is running on the Mac. No tester will run Metro. `preview` runs standalone
   - **Done (2026-08-08):** Android SDK installed; two AVDs built and booted (API 36 → Android 16, API 28 → Android 9, both `arm64-v8a`); app scaffolded on Expo SDK 57.0.11 / RN 0.86.2 as `com.kacooper.reko`; `minSdk` confirmed at 24; the disabled-camera screen written and typechecking clean
   - **Left:** `eas login` → `eas init --id` → cloud build → install on the **S8 first**, then the S23 → write up what the S8 install actually took. Steps and acceptance in `docs/android-emulator-setup.md` §6–§9
   - The write-up is the deliverable, not the build
@@ -115,6 +121,8 @@ Two notes for anyone revisiting this:
   - **D3 holds.** The iPhone cannot run v1 and EAS iOS distribution needs the $99 program. But C1 is a printed card — no app, no phone — so that user joins the most valuable test at full strength. Decide iOS after C1. The `v1.5` milestone already exists for it
   - **The S8 is the constraint and the priority.** Its final OS is Android 9 (API 28), unsupported since ~2021. That is the v1 floor. Reko serves older adults, and older adults keep old phones — the S8 is what the real user holds, so it leads B1 and B2, not the S23
   - **C4 consequence:** the golden set must include photos shot on the S8. It is the worst realistic capture; the S23 camera will flatter the parser
+  - **2026-08-09 — the S8 could not install anything.** It was logged into a minor's account, which is barred from installing unknown apps; the toggle is absent rather than off. Factory reset planned. Real test devices carry real account baggage, and a tester whose phone is managed by a family member cannot sideload at all
+  - The S23 installed fine once its warnings were dismissed. **Owner's call: those warnings are the ordinary cost of installing from the internet rather than a store, and are not a product concern.** The S8's block was different in kind — a refusal, not a warning
   - **~~Open risk~~ — RESOLVED 2026-08-08: `minSdk` is 24, so the S8 is a viable target** with four levels of margin. Confirmed against Expo SDK 57.0.11 / RN 0.86.2 from two independent sources (the `expo-root-project` plugin default and React Native's `libs.versions.toml`). D6 stands as written. Re-check when `react-native-vision-camera` lands at B2 — it inherits the floor rather than setting one, so a camera library is exactly what could raise it
 
 ---
@@ -132,6 +140,7 @@ Two notes for anyone revisiting this:
 ## Open questions
 
 - Selection basis for the Top 100 actives (blocks A5)
+- **Google Play internal testing track — $25 once. Worth costing, not yet decided.** Testers install from the Play Store, so no unknown-sources toggle and no Play Protect prompt. The case for it is not the warnings — those are dismissible, and the owner has judged them a non-issue (C5). The case is the **restricted-device problem**: the S8 could not install at all on a minor's account, and a tester on a family-managed phone hits the same wall. Sideloading also cannot reach them. Revisit after C1, alongside the deferred $99 Apple decision — a store path costs a quarter of it and removes a hard block rather than a nuisance
 - D10: separate `.dev` bundle ID for preview builds?
 - Does `expo-ocr-kit` hold up under real use, or does this become a custom Expo Module? *(Decide after B2 + C4 give a measured number)*
 - UPC barcode → NDC lookup as an OCR alternative — still untested (§10)
