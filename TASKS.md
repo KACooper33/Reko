@@ -110,14 +110,25 @@ Two notes for anyone revisiting this:
   - **Left:** `eas login` → `eas init --id` → cloud build → install on the **S8 first**, then the S23 → write up what the S8 install actually took. Steps and acceptance in `docs/android-emulator-setup.md` §6–§9
   - The write-up is the deliverable, not the build
 - [ ] **B2.** Camera capture → OCR → dump raw text on screen, unstyled
-  - **B2a. Prove the OCR on a still image first — no camera.** Add `expo-ocr-kit`, bundle one photo of a Drug Facts panel, run OCR on the file, print what comes back. If the module is broken on SDK 57 you learn it in an hour with no camera UI written. It also builds the file-based input seam that C4 needs. Do this before B2b
+  - [x] **B2a. Prove the OCR on a still image first — no camera.** ✅ **Done 2026-08-11. `expo-ocr-kit` 0.1.4 works on SDK 57.** All four C4 frames read, no crashes, `localUri` accepted as-is. Full results and the error taxonomy: **`docs/b2a-ocr-findings.md`**
+    - Every ingredient name and strength came through on three of four frames. `minSdk` stayed at 24, so the S8 is still safe
+    - **The difficulty ordering was wrong.** Mylicon — small print on a narrow cylinder — was the worst frame, and it corrupted both the heading and the drug name. NyQuil's inverted white-on-blue read cleanly. **Print size and curvature predict failure; contrast polarity does not.** C4 selection should follow that
+    - Emulator only. Nothing measured on hardware, and nothing on API 28
   - **B2b. Capture with `expo-camera`, not `react-native-vision-camera`** — see the D1 note below
   - **B2c. Multiple stills, merged.** The user turns the bottle and takes two or three photos; OCR each; take the union of the candidates. This is how the curved-bottle wrap gets solved without live frame processing, and B3d confirms the result anyway
   - Re-run the §5a `minSdk` check after any native module lands. 28 is the S8's ceiling
   - Iterate with `npx expo run:android --device` over USB, ~1 min per rebuild. EAS is 10–20 min and would waste the day. Native changes still need an EAS build before they reach a phone by link
 - [ ] **B3a.** Locate the "Active ingredient(s)" section boundary within the OCR output
+  - **Do not match the heading as a string.** B2a measured `Active ingredient` arriving as `Active ingreaiiat`. Exact match fails, and most loose regexes fail too. Use fuzzy matching on the heading, or find the ingredient lines by *shape* — `<name> <number> <unit>` followed by dotted leaders — and infer the section from them
+  - **Use the bounding boxes, not the flat `text` field.** On the two-column TopCare panel the Purpose values land far from their ingredients in the concatenated string. Grouping blocks by `y` reconstructs rows. Every block carries `{x, y, width, height}`
+  - Curved labels return few blocks — Mucinex 6, Mylicon 4, against TopCare's 30 — so there is least spatial structure exactly where it is needed most
 - [ ] **B3b.** Extract candidate ingredient strings + strengths from that section
+  - **Cut each line at the run of leader dots.** B2a showed the Purpose column bleeding in: `Dextromethorphan HBr 15 mg....ough suppressant`. The leaders are how the Drug Facts format separates the columns, so they are a reliable cut point
+  - **Canonicalise the unit token; do not read it literally.** `mL` came back as `m`, `m!`, and `ml` across three frames. `in each 5 m` is as useless as a bare `5 mg`
+  - **Never lift a number from a nearby line.** A bullet glyph merged with a digit and turned `■ 3 or more` into `13 or more`. The same merge beside a strength would turn 5 mg into 15 mg. Every number shown to a user must trace to a matched ingredient
 - [ ] **B3c.** Fuzzy-match candidates against RxNorm, handling OCR noise — **⚠️ this is the real merge point with Track A.** Blocked by A3 (the SQLite) and A4 (the FTS index). Track B stops here until Track A delivers
+  - **B2a gave the real error distribution, so A4's index has a spec now.** Two classes matter: an interior character *deletion* (`Simethicone` → `Smethicone`) and the `l`↔`I` substitution (`HCl` → `HCI`). Trigram or edit-distance matching survives the deletion; exact lookup does not. This is direct evidence A4's FTS design is right
+  - **Handle the salt suffixes by lookup, not fuzzy matching.** The vocabulary is short and closed — `HCl`, `HBr`, maleate, citrate, sodium, sulfate. Lowercasing does **not** help: `hci` and `hcl` still differ
 - [ ] **B3d.** **Confirmation screen** — show what was found, let the user correct it. Never trust the scan silently (§3)
 - [ ] **B4.** Ship the SQLite as a bundled asset; wire lookup → brand bridge. *Previously labelled the merge point — it is not. The tracks meet at B3c; B4 is only where the database ships inside the app.* Brand bridge quality depends on A6
 - [ ] **B5.** Large type + TTS + source attribution line. **A stage, not polish** — §4 calls these core features
@@ -163,7 +174,8 @@ Two notes for anyone revisiting this:
 - Selection basis for the Top 100 actives (blocks A5)
 - **Google Play internal testing track — $25 once. Worth costing, not yet decided.** Testers install from the Play Store, so no unknown-sources toggle and no Play Protect prompt. The case for it is not the warnings — those are dismissible, and the owner has judged them a non-issue (C5). The case is the **restricted-device problem**: the S8 could not install at all on a minor's account, and a tester on a family-managed phone hits the same wall. Sideloading also cannot reach them. Revisit after C1, alongside the deferred $99 Apple decision — a store path costs a quarter of it and removes a hard block rather than a nuisance
 - D10: separate `.dev` bundle ID for preview builds?
-- Does `expo-ocr-kit` hold up under real use, or does this become a custom Expo Module? *(Decide after B2 + C4 give a measured number)*
+- ~~Does `expo-ocr-kit` hold up under real use, or does this become a custom Expo Module?~~ **Answered 2026-08-11 — it holds up.** All four C4 frames read on SDK 57 with no crashes, and every ingredient line came through on three of four. No custom Expo Module needed. See `docs/b2a-ocr-findings.md`. **Still unmeasured: hardware, API 28, and accuracy against a scoring harness rather than eyeballs** — reopen only on a measured failure
+- **The UPC came back as text, not as a scanned code.** OCR read NyQuil's barcode digits as `227LO,0062`, which is useless. The barcode path needs a real barcode reader; OCR is not a substitute. That is a separate dependency to cost before the barcode question can be answered
 - **UPC barcode → NDC lookup as an OCR alternative — still untested (§10). Curved bottles are the strongest argument for it.** A barcode is small, sits on a flat-enough patch, and is designed to be read by a machine, so it sidesteps the wrap problem entirely for any product carrying one. Test it on the same bottles during B2 and C4. **If a barcode resolves a product that OCR could not read, that is a significant finding** — and it would reopen how much OCR accuracy v1 actually needs
 
 ---

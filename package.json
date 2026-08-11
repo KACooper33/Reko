@@ -4,6 +4,8 @@
   "main": "index.ts",
   "dependencies": {
     "expo": "~57.0.11",
+    "expo-asset": "~57.0.10",
+    "expo-ocr-kit": "^0.1.4",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
     "react-native": "0.86.2"
