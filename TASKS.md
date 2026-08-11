@@ -82,11 +82,21 @@ Two notes for anyone revisiting this:
 > waits only on you.
 
 - [ ] **A1.** Create UMLS account, accept Metathesaurus license, get UTS API key ← *most time-sensitive item on this list; approval is not instant*
-- [ ] **A2.** Download RxNorm full monthly release (RRF)
-- [ ] **A3.** Prune to SQLite: ingredients (IN/PIN), brand names (BN), and the relationships between them. Record final file size
-- [ ] **A4.** Add FTS index for approximate matching against noisy OCR output
+- [x] **A2.** Download RxNorm full monthly release (RRF) — **done 2026-08-11**, release 03-Aug-2026, 248 MB. `./scripts/fetch-rxnorm.sh`, which reads `UMLS_API_KEY` from `.env` and never exposes it to `ps`. Only 2 of the 12 RRF files are needed; `RXNSAT.RRF` (533 MB) is never opened
+- [x] **A3.** Prune to SQLite: ingredients (IN/PIN), brand names (BN), and the relationships between them. Record final file size — **done 2026-08-11. 5.1 MB**, against a 25 MB target agreed for APK bundling. `python3 scripts/build-rxnorm-db.py`
+  - 23,445 concepts — IN 14,663, PIN 3,659, BN 5,123 — and 20,680 edges
+  - **The size ceiling is not a constraint.** There is room for A7–A8's plain-language text without approaching it
+  - **Two RRF traps, both of which produced silent wrong answers.** `SUPPRESS` is empty on every row of `RXNREL`, not `N` as in `RXNCONSO` — applying the `RXNCONSO` rule kept 0 edges and still reported a plausible database. And RRF rows read **right to left**: `rxcui2 <RELA> rxcui1`, so querying the bridge the intuitive way returns zero rows and looks like missing data. See `docs/a3-a4-findings.md`
+- [x] **A4.** ~~Add FTS index for approximate matching against noisy OCR output~~ — **done, but the premise was wrong.** FTS5's trigram tokenizer gives **substring** search, not fuzzy: `MATCH 'smethicone'` returns **no rows**, so it cannot find `simethicone` — the exact deletion B2a measured
+  - **What works: trigram set overlap scored across all IN/PIN rows. 19 ms for 18,322 concepts.** No index needed — A3 pruned hard enough that brute force is viable. Laptop number; measure on the S8
+  - The FTS index is kept for a different job: substring and prefix search when the user types a correction on B3d
+  - **Salt abbreviations need a lookup, not fuzzy matching.** `HBr` and `Hydrobromide` share no trigrams. A three-entry map (`hcl`, `hbr`, and `hci` for the `l`→`I` misread) turns both failing cases into exact 1.00 matches
+  - **⚠️ The margins are thin, and both runners-up are real substances.** `Smethicone` scores simethicone 0.64 against dimethicone 0.53; `Dextromethorphan HBr` scores dextromethorphan 0.81 against deudextromethorphan 0.71. **Direct evidence for B3d** — a fuzzy match must never be accepted silently
 - [ ] **A5.** Extract the Top 100 OTC actives list — **decide the selection basis first** and write it down *(blocks A6–A9)*
 - [ ] **A6.** **Curate the brand allowlist by hand.** ~150–250 recognizable US household brands, ranked. Everything else suppressed
+  - **A6's own test has been run for real (2026-08-11). Diphenhydramine returns 54 brands.** The recognisable ones are there — Benadryl, Aleve PM, Excedrin PM, Doans PM, Compoz — alongside `Acetadryl`, `Banophen Cream`, `Dermamycin`, `Diphenhist`, and **`Calagel Reformulated Jun 2019`**, which is a registry artefact rather than a brand any person would recognise
+  - **So A6 is an editorial job, not a size one.** At 5.1 MB the database is already comfortable; the allowlist exists to suppress noise like that line. RxNorm cannot do it for you
+  - Consequently A6 is **not** on the critical path for the database, and A5 does not block it
   - Test: does diphenhydramine return "Benadryl, ZzzQuil, Tylenol PM" and *not* forty store brands?
 - [ ] **A7.** Pull DailyMed SPL text for the Top 100
 - [ ] **A8.** Build-time generation pass: SPL text → plain language, per D7
