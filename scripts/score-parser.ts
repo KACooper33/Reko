@@ -70,6 +70,7 @@ async function main() {
   let products = 0;
   let passed = 0;
   let bridgeGaps = 0;
+  let phantoms = 0;   // extracted ingredients that would be SHOWN but are not on the label
   const missingOcr: string[] = [];
 
   for (const { file, answer } of answers) {
@@ -145,6 +146,26 @@ async function main() {
       }
     }
 
+    // Precision, not just recall. An invented ingredient is arguably worse than a
+    // missed one: B3d would ask the user to confirm something that is not on the
+    // label. Measured on Mucinex frame 2, whose severe OCR corruption produces
+    // extractions like "azsin" and "tie ngredients (in each".
+    const expectedNorms = expected.map((e) => normalize(e.ingredient || e.printed));
+    for (const a of found.values()) {
+      const m = matchIngredient(a.name, index, 1);
+      const top = m.candidates[0];
+      if (!top) continue; // below the score floor — never shown, so not a phantom
+      const base = await db.baseIngredient(top.rxcui);
+      const resolved = normalize(base?.name ?? top.name);
+      const accounted = expectedNorms.some(
+        (e) => e === resolved || e.startsWith(resolved) || resolved.startsWith(e),
+      );
+      if (!accounted) {
+        phantoms++;
+        lines.push(`      ! PHANTOM ${JSON.stringify(a.name)} → ${resolved} ${top.score.toFixed(2)}`);
+      }
+    }
+
     const all = ok === expected.length;
     if (all) passed++;
     const basisOk = !answer.basis || (basis && normalize(basis) === normalize(answer.basis));
@@ -169,8 +190,13 @@ async function main() {
       ? 'brand bridge: every matched ingredient resolved to at least one brand'
       : `brand bridge: ${bridgeGaps} matched ingredients returned NO brands`,
   );
+  console.log(
+    phantoms === 0
+      ? 'precision: no invented ingredients would reach a user'
+      : `precision: ${phantoms} PHANTOM ingredients would be shown — not on any label`,
+  );
   db.close();
-  if ((products && passed < products) || bridgeGaps) process.exitCode = 1;
+  if ((products && passed < products) || bridgeGaps || phantoms) process.exitCode = 1;
 }
 
 main();

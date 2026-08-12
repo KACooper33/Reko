@@ -39,6 +39,12 @@ export const BASE_INGREDIENT = `
  * Brands for a concept, via all three paths, because which one applies depends on
  * whether the match landed on an IN or a PIN.
  *
+ * **Every path joins `brand_otc`.** D4 scopes v1 to OTC only, and RxNorm's BN set
+ * spans prescription and over-the-counter with no flag. Unfiltered, dextromethorphan
+ * returns Auvelity — an Rx antidepressant — to someone holding children's cough
+ * syrup. `scripts/tag-otc-brands.py` populates the table; it over-suppresses on
+ * purpose, because a thin answer beats a wrong one here.
+ *
  * Measured before writing this: querying only `has_tradename` returns **zero**
  * brands for a PIN, and three of the four C4 products match a PIN. A bridge that
  * silently returns nothing for most real labels is worse than no bridge.
@@ -48,15 +54,25 @@ export const BASE_INGREDIENT = `
  *   3. PIN -> IN -> BN  via form_of then has_tradename (the base's brands)
  */
 export const BRANDS_FOR = `
-  SELECT DISTINCT b.name FROM rel r JOIN concepts b ON b.rxcui = r.rxcui1
-   WHERE r.rela = 'has_tradename' AND b.tty = 'BN' AND r.rxcui2 = ?
-  UNION
-  SELECT DISTINCT b.name FROM rel r JOIN concepts b ON b.rxcui = r.rxcui2
-   WHERE r.rela = 'has_precise_ingredient' AND b.tty = 'BN' AND r.rxcui1 = ?
-  UNION
-  SELECT DISTINCT b.name FROM rel r JOIN concepts b ON b.rxcui = r.rxcui1
-   WHERE r.rela = 'has_tradename' AND b.tty = 'BN' AND r.rxcui2 = (
-     SELECT rxcui1 FROM rel WHERE rxcui2 = ? AND rela = 'form_of' LIMIT 1
-   )
-  ORDER BY 1
+  SELECT name FROM (
+    SELECT DISTINCT b.name AS name, o.reach AS reach FROM rel r
+      JOIN concepts b ON b.rxcui = r.rxcui1
+      JOIN brand_otc o ON o.rxcui = b.rxcui AND o.confirmed = 1
+     WHERE r.rela = 'has_tradename' AND b.tty = 'BN' AND r.rxcui2 = ?
+    UNION
+    SELECT DISTINCT b.name, o.reach FROM rel r
+      JOIN concepts b ON b.rxcui = r.rxcui2
+      JOIN brand_otc o ON o.rxcui = b.rxcui AND o.confirmed = 1
+     WHERE r.rela = 'has_precise_ingredient' AND b.tty = 'BN' AND r.rxcui1 = ?
+    UNION
+    SELECT DISTINCT b.name, o.reach FROM rel r
+      JOIN concepts b ON b.rxcui = r.rxcui1
+      JOIN brand_otc o ON o.rxcui = b.rxcui AND o.confirmed = 1
+     WHERE r.rela = 'has_tradename' AND b.tty = 'BN' AND r.rxcui2 = (
+       SELECT rxcui1 FROM rel WHERE rxcui2 = ? AND rela = 'form_of' LIMIT 1
+     )
+  )
+  -- Widest-marketed first, then shortest name. Alphabetical ordering buried Tylenol
+  -- under "Arthriten Inflammatory Pain" and it never reached the visible list.
+  ORDER BY reach DESC, LENGTH(name), name
 `;

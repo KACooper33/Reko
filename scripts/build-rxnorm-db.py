@@ -40,7 +40,9 @@ import shutil
 import sqlite3
 import sys
 import time
-import unicodedata
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from rxnorm_common import normalize  # noqa: E402
 
 RAW = "data/raw"
 OUT = "data/rxnorm.sqlite"
@@ -82,12 +84,6 @@ KEEP_RELA = {
     "form_of",
     "has_form",
 }
-
-
-def normalize(s: str) -> str:
-    """Lowercase, NFKC, collapse whitespace. Nothing clever — see module docstring."""
-    s = unicodedata.normalize("NFKC", s)
-    return " ".join(s.lower().split())
 
 
 def die(msg: str) -> None:

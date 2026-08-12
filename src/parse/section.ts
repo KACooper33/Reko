@@ -147,6 +147,12 @@ function extractBasis(line: string): string | null {
  */
 function looksLikeStrength(line: string): boolean {
   if (!STRENGTH_LINE.test(line)) return false;
+  // A heading is never an active. Measured on Mucinex frame 2, where the corrupted
+  // heading "tie ngredients (in each 5 mL) Purposes" carried a number and a unit and
+  // was extracted as an ingredient. It matched nothing, so it was harmless — but a
+  // corrupted heading that did fuzzy-match some ingredient would become a phantom,
+  // and B3d would then ask the user to confirm something fabricated.
+  if (headingScore(line) >= 0.35) return false;
   const n = normalize(line);
   if (/\b(do not|warning|overdose|more than|exceed|every \d|hrs|hours|doses|ask a doctor)\b/.test(n)) {
     return false;
