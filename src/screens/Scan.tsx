@@ -256,6 +256,9 @@ export function Scan({ onOpenHarness }: { onOpenHarness: () => void }) {
                   </>
                 )}
               </Text>
+              {/* Says why the line repeats the ingredient's own name, so the
+                  repetition reads as an absence of data rather than a glitch. */}
+              {!f.primaryBrand && <Text style={s.subtext}>(Brand name not found)</Text>}
 
               {f.brands.length > 0 && (
                 <Pressable
@@ -378,6 +381,7 @@ const s = StyleSheet.create({
   unsure: { fontSize: 15, color: '#8a4b00', marginTop: 4, lineHeight: 21 },
   headline: { fontSize: 18, lineHeight: 25, marginTop: 8 },
   brandName: { fontWeight: '700' },
+  subtext: { fontSize: 13, opacity: 0.5, marginTop: -2 },
   expandRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6 },
   expandText: { fontSize: 15, color: '#1b4ed8' },
   expandChevron: { fontSize: 13, color: '#1b4ed8' },
