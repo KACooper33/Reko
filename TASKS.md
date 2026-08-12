@@ -81,7 +81,7 @@ Two notes for anyone revisiting this:
 > does not work before any code exists. **Start both today.** Everything else on this list
 > waits only on you.
 
-- [ ] **A1.** Create UMLS account, accept Metathesaurus license, get UTS API key ← *most time-sensitive item on this list; approval is not instant*
+- [x] **A1.** Create UMLS account, accept Metathesaurus license, get UTS API key — **approved and working 2026-08-11.** The key lives in `.env` (gitignored) and downloaded the 03-Aug-2026 release. It gated A2 → A3 → A4 → B3c; all four are now done
 - [x] **A2.** Download RxNorm full monthly release (RRF) — **done 2026-08-11**, release 03-Aug-2026, 248 MB. `./scripts/fetch-rxnorm.sh`, which reads `UMLS_API_KEY` from `.env` and never exposes it to `ps`. Only 2 of the 12 RRF files are needed; `RXNSAT.RRF` (533 MB) is never opened
 - [x] **A3.** Prune to SQLite: ingredients (IN/PIN), brand names (BN), and the relationships between them. Record final file size — **done 2026-08-11. 5.1 MB**, against a 25 MB target agreed for APK bundling. `python3 scripts/build-rxnorm-db.py`
   - 23,445 concepts — IN 14,663, PIN 3,659, BN 5,123 — and 20,680 edges
@@ -101,7 +101,10 @@ Two notes for anyone revisiting this:
 - [ ] **A7.** Pull DailyMed SPL text for the Top 100
 - [ ] **A8.** Build-time generation pass: SPL text → plain language, per D7
 - [ ] **A9.** **Read all 100 personally.** Check tone against handoff §4 — plain, not childish
-- [ ] **A10.** Add NLM attribution string to the source line
+- [x] **A10.** Add NLM attribution string to the source line — **done 2026-08-11.** Required verbatim by NLM's RxNorm Terms of Service, and now rendered in the app
+  - Stored as a row in the database's `meta` table, not as an app constant, so the text travels with the data it describes
+  - **A second obligation came with it, which was not in the plan:** a redistributor must either keep the data current *or* clearly disclose that the bundled copy is not the most current from NLM. A SQLite frozen in an APK is stale by definition, so the app shows **"RxNorm data as of 2026-08-03"**, read from `meta` rather than hardcoded
+  - The release date is derived from the downloaded zip's filename by `build-rxnorm-db.py`, so it cannot drift from the data
 
 ---
 
@@ -125,22 +128,30 @@ Two notes for anyone revisiting this:
     - **The difficulty ordering was wrong.** Mylicon — small print on a narrow cylinder — was the worst frame, and it corrupted both the heading and the drug name. NyQuil's inverted white-on-blue read cleanly. **Print size and curvature predict failure; contrast polarity does not.** C4 selection should follow that
     - Emulator only. Nothing measured on hardware, and nothing on API 28
   - **B2b. Capture with `expo-camera`, not `react-native-vision-camera`** — see the D1 note below
+  - **B2c is implemented but unproven.** The scoring harness takes the union of actives across a product's frames, so the logic exists — but no C4 product yet *requires* two frames, so it has nothing to fail against. Mucinex needs a second frame
   - **B2c. Multiple stills, merged.** The user turns the bottle and takes two or three photos; OCR each; take the union of the candidates. This is how the curved-bottle wrap gets solved without live frame processing, and B3d confirms the result anyway
   - Re-run the §5a `minSdk` check after any native module lands. 28 is the S8's ceiling
   - Iterate with `npx expo run:android --device` over USB, ~1 min per rebuild. EAS is 10–20 min and would waste the day. Native changes still need an EAS build before they reach a phone by link
-- [ ] **B3a.** Locate the "Active ingredient(s)" section boundary within the OCR output
+- [x] **B3a.** Locate the "Active ingredient(s)" section boundary within the OCR output — **done 2026-08-11, `src/parse/section.ts`. 4/4 C4 products.** Full results: `docs/b3-findings.md`
+  - **Two structural findings, both of which failed silently.** *A block is not a line* — 11 of TopCare's 30 blocks contain embedded newlines, and the actives block holds the heading plus all three ingredients in one string. Joining block text and collapsing whitespace made an anchored regex return **one** active from a three-active product, with no error. And *a row's cells must stay separate*: because photos are rotated 90°, x-order is not reading order, so Mylicon's row concatenated as `"..Antigs Smethicone 20 mg."` with the Purpose cell first. The parser now splits blocks into lines before grouping, and reads row **cells** independently
+  - All four products were found via the heading; the shape fallback was not needed. Mylicon's corrupted `Active ingreaiiat` still scored 0.50 against the 0.45 floor
   - **Do not match the heading as a string.** B2a measured `Active ingredient` arriving as `Active ingreaiiat`. Exact match fails, and most loose regexes fail too. Use fuzzy matching on the heading, or find the ingredient lines by *shape* — `<name> <number> <unit>` followed by dotted leaders — and infer the section from them
   - **Use the bounding boxes, not the flat `text` field.** On the two-column TopCare panel the Purpose values land far from their ingredients in the concatenated string. Grouping blocks by `y` reconstructs rows. Every block carries `{x, y, width, height}`
   - Curved labels return few blocks — Mucinex 6, Mylicon 4, against TopCare's 30 — so there is least spatial structure exactly where it is needed most
-- [ ] **B3b.** Extract candidate ingredient strings + strengths from that section
+- [x] **B3b.** Extract candidate ingredient strings + strengths from that section — **done 2026-08-11, `src/parse/actives.ts`.** Every active, strength and basis correct on all four products
+  - `cutAtLeaders` had to strip **leading** junk before cutting: Mylicon's Purpose cell begins `..Antigs`, so cutting at the first dot run returned an empty string and dropped the ingredient
+  - The `basis` clause needed the same unit canonicalisation as strengths — `(in each 0.3 m!)` → `in each 0.3 mL`. Shared in `src/parse/units.ts`
   - **Cut each line at the run of leader dots.** B2a showed the Purpose column bleeding in: `Dextromethorphan HBr 15 mg....ough suppressant`. The leaders are how the Drug Facts format separates the columns, so they are a reliable cut point
   - **Canonicalise the unit token; do not read it literally.** `mL` came back as `m`, `m!`, and `ml` across three frames. `in each 5 m` is as useless as a bare `5 mg`
   - **Never lift a number from a nearby line.** A bullet glyph merged with a digit and turned `■ 3 or more` into `13 or more`. The same merge beside a strength would turn 5 mg into 15 mg. Every number shown to a user must trace to a matched ingredient
-- [ ] **B3c.** Fuzzy-match candidates against RxNorm, handling OCR noise — **⚠️ this is the real merge point with Track A.** Blocked by A3 (the SQLite) and A4 (the FTS index). Track B stops here until Track A delivers
+- [x] **B3c.** Fuzzy-match candidates against RxNorm, handling OCR noise — **done 2026-08-11, `src/match/rxnorm.ts`. The merge point is crossed; both tracks met.** 4/4 products matched to the right concept
+  - **The confidence rule is doing real work.** All four matched, yet most are flagged *not confident*: a 1.00 score for `dextromethorphan hydrobromide` sits only 0.09 above `deudextromethorphan hydrobromide`, a real and different drug. The rule needs a 0.75 floor **and** a 0.15 margin over the runner-up. **This is the evidence B3d is load-bearing rather than courteous**
+  - On-device parity confirmed on the API 36 emulator: identical parses, scores and flags. Match costs **144–164 ms**; the trigram index builds in **509 ms** at startup. Not yet measured on hardware
+  - `scripts/check-normalize-parity.ts` proves the TS and Python normalizers agree on **all 23,445** concept names, so the one-function-three-places rule is enforced rather than asserted
   - **B2a gave the real error distribution, so A4's index has a spec now.** Two classes matter: an interior character *deletion* (`Simethicone` → `Smethicone`) and the `l`↔`I` substitution (`HCl` → `HCI`). Trigram or edit-distance matching survives the deletion; exact lookup does not. This is direct evidence A4's FTS design is right
   - **Handle the salt suffixes by lookup, not fuzzy matching.** The vocabulary is short and closed — `HCl`, `HBr`, maleate, citrate, sodium, sulfate. Lowercasing does **not** help: `hci` and `hcl` still differ
 - [ ] **B3d.** **Confirmation screen** — show what was found, let the user correct it. Never trust the scan silently (§3)
-- [ ] **B4.** Ship the SQLite as a bundled asset; wire lookup → brand bridge. *Previously labelled the merge point — it is not. The tracks meet at B3c; B4 is only where the database ships inside the app.* Brand bridge quality depends on A6
+- [ ] **B4.** ~~Ship the SQLite as a bundled asset~~ **done 2026-08-11** — `assets/rxnorm.sqlite` is committed and loaded via `SQLiteProvider`'s `assetSource`; `metro.config.js` adds `sqlite` to `assetExts`, without which it fails at runtime rather than at build time. **Remaining: wire lookup → brand bridge.** `brandsFor()` exists and is tested but nothing calls it on screen. *Previously labelled the merge point — it is not. The tracks meet at B3c; B4 is only where the database ships inside the app.* Brand bridge quality depends on A6
 - [ ] **B5.** Large type + TTS + source attribution line. **A stage, not polish** — §4 calls these core features
 
 ---

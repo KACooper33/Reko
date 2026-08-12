@@ -1,0 +1,17 @@
+{
+  // The laptop-side code: the scoring harness and the Node database adapter.
+  // Separate from the app's config so @types/node cannot collide with React
+  // Native's global types. Both are checked by `npm run typecheck`.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true
+  },
+  "include": ["scripts/**/*.ts", "src/**/*.ts"],
+  "exclude": ["src/db/expo.ts"]
+}

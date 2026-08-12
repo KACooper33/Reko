@@ -2,5 +2,9 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true
-  }
+  },
+  // The app's typecheck deliberately excludes the Node-only files. Pulling
+  // @types/node into this project would redefine setTimeout and friends against
+  // React Native's own types. Those files are checked by tsconfig.node.json.
+  "exclude": ["node_modules", "scripts", "src/db/node.ts"]
 }

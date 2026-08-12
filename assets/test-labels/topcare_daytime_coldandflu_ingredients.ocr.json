@@ -1,0 +1,275 @@
+{
+  "text": "Drug Facts\naVNISOTOENEIYSANON\nActive ingredients (in each softgel)\nAcetaminophen 325 mg.....\nDextromethorphan HBr 10 mg....\nPhenylephrine HCI 5 mg...\nnasal congestion\nDO NOT USE IF BLISTER UNIT IS BROKEN OR TORN\nUses temporarily relieves common cold/flu symptoms:\ncOugh due to minor throat and bronchial irritation\n| Sore throat headache\nWarnings\nmore than 4,000 mg of acetaminophen in 24 hours\nwith other drugs containing acetaminophen\nLiver warning: This product contains acetaminophen. Severe liver damage may occur if you take\n13 or more alcoholic drinks every day while using this product\nI skin reddening blisters Irash\nAllergy alert: Acetaminophen may cause severe skin reactions. Symptoms may include:\nIfa skin reaction occurs, stop use and seek medical help right away.\nminor aches and pains\nfever\nSore throat warning: If sore throat is severe, lasts for more than 2 days, is accompanied or followed\nby fever, headache, rash, nausea, or vomiting, consult a doctor promptiy.\nDo not use I with any other drug containing acetaminophen (prescription or nonprescription).\nIf you are not sure whether a drug contains acetaminophen, ask a doctor or pharmacist. if you are\nnow takinga prescription monoamine oxidase inhibitor (MAOI) (certain drugs for depression,\npsychiatric, or emotional conditions, or Parkinson's disease), or for 2 weeks after stopping the MAOI\ndrug. If you do not know if your prescription drug contains an MAOI, ask a doctor or pharmacist before\ntaking this product. if you have ever had an allergic reaction to this product or any of its ingredients\nAsk a doctor before use if you have COugh that occurs with too much phlegm (mucus)\npersistent or chronic cough as ocCurs with smoking, asthma, or emphysema\ntrouble urinating due to an enlarged prostate gland\nheart disease high blo0d pressure thyroid disease\nAsk a doctor or pharmacist before use if you are taking the blood thinning drug warfain\nWhen using this product do not use more than directed\nStop use and ask a doctor if you get nervous, dizzy or sleepless\npain, nasal congestion or cOugh gets Worse or lasts more than 7 days\nfever gets worse or lasts more than 3 days\nrednesS or swelling is present new symptoms 0CCur\n.Pain reliever/fever reducer\n.Cough suppressant\n.Nasal decongestant\nadults & children 12 yrs & over\nPurpose\ncOugh comes back or occurs with\nrash or headache that lasts. These could be signs of a serious condition.\nchildren 4 to under 12 yrs\nIf pregnant or breast-feeding, ask a health professional before use.\nKeep out of reach of children. Overdose warning: In case of overdose, get medical help or contact\na Poison Control Center right away (1-800-222-1222). Quick medical attention is critical for adults as\nwell as for children even if you do not notice any signs or symptoms.\nchildren under 4 yrs\nliver disease\ndiabetes\nDirections take only as directed see overdose warning do not exceed 4 doses per 24 hrs\n2 softgels with water every 4 hrs\nask a doctor\ndo not use",
+  "blocks": [
+    {
+      "text": "Drug Facts",
+      "boundingBox": {
+        "x": 437,
+        "y": 610,
+        "width": 337,
+        "height": 85
+      }
+    },
+    {
+      "text": "aVNISOTOENEIYSANON",
+      "boundingBox": {
+        "x": 862,
+        "y": 145,
+        "width": 1383,
+        "height": 100
+      }
+    },
+    {
+      "text": "Active ingredients (in each softgel)\nAcetaminophen 325 mg.....\nDextromethorphan HBr 10 mg....\nPhenylephrine HCI 5 mg...",
+      "boundingBox": {
+        "x": 433,
+        "y": 713,
+        "width": 950,
+        "height": 273
+      }
+    },
+    {
+      "text": "nasal congestion",
+      "boundingBox": {
+        "x": 491,
+        "y": 1150,
+        "width": 353,
+        "height": 57
+      }
+    },
+    {
+      "text": "DO NOT USE IF BLISTER UNIT IS BROKEN OR TORN",
+      "boundingBox": {
+        "x": 882,
+        "y": 566,
+        "width": 1188,
+        "height": 72
+      }
+    },
+    {
+      "text": "Uses temporarily relieves common cold/flu symptoms:\ncOugh due to minor throat and bronchial irritation\n| Sore throat headache",
+      "boundingBox": {
+        "x": 442,
+        "y": 1007,
+        "width": 1203,
+        "height": 208
+      }
+    },
+    {
+      "text": "Warnings",
+      "boundingBox": {
+        "x": 441,
+        "y": 1231,
+        "width": 257,
+        "height": 87
+      }
+    },
+    {
+      "text": "more than 4,000 mg of acetaminophen in 24 hours",
+      "boundingBox": {
+        "x": 494,
+        "y": 1377,
+        "width": 1100,
+        "height": 58
+      }
+    },
+    {
+      "text": "with other drugs containing acetaminophen",
+      "boundingBox": {
+        "x": 492,
+        "y": 1441,
+        "width": 934,
+        "height": 58
+      }
+    },
+    {
+      "text": "Liver warning: This product contains acetaminophen. Severe liver damage may occur if you take",
+      "boundingBox": {
+        "x": 442,
+        "y": 1309,
+        "width": 2099,
+        "height": 63
+      }
+    },
+    {
+      "text": "13 or more alcoholic drinks every day while using this product",
+      "boundingBox": {
+        "x": 474,
+        "y": 1504,
+        "width": 1333,
+        "height": 60
+      }
+    },
+    {
+      "text": "I skin reddening blisters Irash",
+      "boundingBox": {
+        "x": 480,
+        "y": 1622,
+        "width": 819,
+        "height": 77
+      }
+    },
+    {
+      "text": "Allergy alert: Acetaminophen may cause severe skin reactions. Symptoms may include:",
+      "boundingBox": {
+        "x": 443,
+        "y": 1567,
+        "width": 1898,
+        "height": 57
+      }
+    },
+    {
+      "text": "Ifa skin reaction occurs, stop use and seek medical help right away.",
+      "boundingBox": {
+        "x": 452,
+        "y": 1695,
+        "width": 1469,
+        "height": 56
+      }
+    },
+    {
+      "text": "minor aches and pains\nfever",
+      "boundingBox": {
+        "x": 1674,
+        "y": 1082,
+        "width": 491,
+        "height": 116
+      }
+    },
+    {
+      "text": "Sore throat warning: If sore throat is severe, lasts for more than 2 days, is accompanied or followed\nby fever, headache, rash, nausea, or vomiting, consult a doctor promptiy.",
+      "boundingBox": {
+        "x": 446,
+        "y": 1757,
+        "width": 2169,
+        "height": 122
+      }
+    },
+    {
+      "text": "Do not use I with any other drug containing acetaminophen (prescription or nonprescription).\nIf you are not sure whether a drug contains acetaminophen, ask a doctor or pharmacist. if you are\nnow takinga prescription monoamine oxidase inhibitor (MAOI) (certain drugs for depression,\npsychiatric, or emotional conditions, or Parkinson's disease), or for 2 weeks after stopping the MAOI\ndrug. If you do not know if your prescription drug contains an MAOI, ask a doctor or pharmacist before\ntaking this product. if you have ever had an allergic reaction to this product or any of its ingredients\nAsk a doctor before use if you have COugh that occurs with too much phlegm (mucus)\npersistent or chronic cough as ocCurs with smoking, asthma, or emphysema\ntrouble urinating due to an enlarged prostate gland\nheart disease high blo0d pressure thyroid disease\nAsk a doctor or pharmacist before use if you are taking the blood thinning drug warfain\nWhen using this product do not use more than directed",
+      "boundingBox": {
+        "x": 446,
+        "y": 1883,
+        "width": 2199,
+        "height": 835
+      }
+    },
+    {
+      "text": "Stop use and ask a doctor if you get nervous, dizzy or sleepless\npain, nasal congestion or cOugh gets Worse or lasts more than 7 days\nfever gets worse or lasts more than 3 days",
+      "boundingBox": {
+        "x": 452,
+        "y": 2724,
+        "width": 1537,
+        "height": 198
+      }
+    },
+    {
+      "text": "rednesS or swelling is present new symptoms 0CCur",
+      "boundingBox": {
+        "x": 511,
+        "y": 2915,
+        "width": 1197,
+        "height": 68
+      }
+    },
+    {
+      "text": ".Pain reliever/fever reducer\n.Cough suppressant\n.Nasal decongestant",
+      "boundingBox": {
+        "x": 2083,
+        "y": 774,
+        "width": 590,
+        "height": 197
+      }
+    },
+    {
+      "text": "adults & children 12 yrs & over",
+      "boundingBox": {
+        "x": 515,
+        "y": 3420,
+        "width": 655,
+        "height": 63
+      }
+    },
+    {
+      "text": "Purpose",
+      "boundingBox": {
+        "x": 2446,
+        "y": 701,
+        "width": 227,
+        "height": 70
+      }
+    },
+    {
+      "text": "cOugh comes back or occurs with\nrash or headache that lasts. These could be signs of a serious condition.",
+      "boundingBox": {
+        "x": 461,
+        "y": 2895,
+        "width": 2054,
+        "height": 152
+      }
+    },
+    {
+      "text": "children 4 to under 12 yrs",
+      "boundingBox": {
+        "x": 516,
+        "y": 3501,
+        "width": 547,
+        "height": 67
+      }
+    },
+    {
+      "text": "If pregnant or breast-feeding, ask a health professional before use.\nKeep out of reach of children. Overdose warning: In case of overdose, get medical help or contact\na Poison Control Center right away (1-800-222-1222). Quick medical attention is critical for adults as\nwell as for children even if you do not notice any signs or symptoms.",
+      "boundingBox": {
+        "x": 460,
+        "y": 3020,
+        "width": 2118,
+        "height": 279
+      }
+    },
+    {
+      "text": "children under 4 yrs",
+      "boundingBox": {
+        "x": 516,
+        "y": 3585,
+        "width": 421,
+        "height": 64
+      }
+    },
+    {
+      "text": "liver disease\ndiabetes",
+      "boundingBox": {
+        "x": 1899,
+        "y": 2422,
+        "width": 255,
+        "height": 113
+      }
+    },
+    {
+      "text": "Directions take only as directed see overdose warning do not exceed 4 doses per 24 hrs\n2 softgels with water every 4 hrs",
+      "boundingBox": {
+        "x": 467,
+        "y": 3289,
+        "width": 2089,
+        "height": 198
+      }
+    },
+    {
+      "text": "ask a doctor",
+      "boundingBox": {
+        "x": 1425,
+        "y": 3481,
+        "width": 247,
+        "height": 52
+      }
+    },
+    {
+      "text": "do not use",
+      "boundingBox": {
+        "x": 1422,
+        "y": 3562,
+        "width": 210,
+        "height": 47
+      }
+    }
+  ]
+}
