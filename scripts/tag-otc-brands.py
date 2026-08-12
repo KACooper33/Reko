@@ -166,6 +166,14 @@ def main() -> None:
         if any(bn_norm == p for p, _ in pool):
             verdict[bn_rxcui] = (1, "exact")
             continue
+        # Prefix, BEFORE fuzzy. Jaccard penalises a short brand against a long
+        # product name: "gas-x" against "gas-x extra strength" scores 0.00, and
+        # "sudafed" against "sudafed sinus congestion plus cold" only 0.32. So the
+        # punchiest household names — exactly the ones worth showing — were being
+        # rejected by similarity alone.
+        if any(p.startswith(bn_norm) for p, _ in pool):
+            verdict[bn_rxcui] = (1, "prefix")
+            continue
         bt = trigrams(bn_norm)
         if any(jaccard(bt, pt) >= FUZZY_MIN for _, pt in pool):
             verdict[bn_rxcui] = (1, "fuzzy")

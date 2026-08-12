@@ -76,3 +76,44 @@ export const BRANDS_FOR = `
   -- under "Arthriten Inflammatory Pain" and it never reached the visible list.
   ORDER BY reach DESC, LENGTH(name), name
 `;
+
+/**
+ * The single recognisable brand for an ingredient.
+ *
+ * Ordering by `reach` puts the household name first — Tylenol 95, Mucinex 132,
+ * Advil 56, Benadryl 24, Delsym 9.
+ *
+ * THE THRESHOLD WAS 5, AND THAT WAS WRONG. It was set from two failures, both at
+ * reach 1 (Clorrelief for chlorpheniramine, Gelusil for simethicone), and then
+ * generalised. Reading the whole 2–4 band showed the real boundary sits between 1
+ * and 2: that band contains Imodium, Prilosec, Nexium, Voltaren, Narcan, Metamucil,
+ * Tagamet, Citrucel, Abreva, Listerine, Nasacort and Xyzal — none of them marginal.
+ *
+ * At 2, fifty-four more ingredients get a brand. Roughly half are instantly
+ * recognisable and the rest are real but unfamiliar; none is wrong. Being generous
+ * is safe because a weak line is no longer a hole — src/screens/Scan.tsx falls back
+ * to the ingredient's own name when nothing clears this bar at all.
+ */
+export const PRIMARY_BRAND_MIN_REACH = 2;
+
+export const PRIMARY_BRAND_FOR = `
+  SELECT b.name, o.reach FROM rel r
+    JOIN concepts b ON b.rxcui = r.rxcui1
+    JOIN brand_otc o ON o.rxcui = b.rxcui AND o.confirmed = 1
+   WHERE r.rela = 'has_tradename' AND b.tty = 'BN' AND r.rxcui2 = ?
+     AND o.reach >= ${PRIMARY_BRAND_MIN_REACH}
+   ORDER BY o.reach DESC, LENGTH(b.name), b.name
+   LIMIT 1
+`;
+
+/**
+ * What the ingredient is for.
+ *
+ * `purpose_display` wins when present — that column is where hand-written copy goes
+ * when A8 runs. Until then this returns openFDA's own wording, which is accurate but
+ * clinical: "Antigas", "Antihistamine". Deliberate interim choice.
+ */
+export const PURPOSE_FOR = `
+  SELECT COALESCE(purpose_display, purpose) AS purpose, uses
+    FROM ingredient_purpose WHERE rxcui = ?
+`;

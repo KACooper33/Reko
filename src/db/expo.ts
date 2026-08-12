@@ -6,7 +6,14 @@
  */
 import type { SQLiteDatabase } from 'expo-sqlite';
 import type { ConceptRow, RxnormDb } from './types';
-import { BASE_INGREDIENT, BRANDS_FOR, INGREDIENTS, META } from './queries';
+import {
+  BASE_INGREDIENT,
+  BRANDS_FOR,
+  INGREDIENTS,
+  META,
+  PRIMARY_BRAND_FOR,
+  PURPOSE_FOR,
+} from './queries';
 
 export class ExpoRxnormDb implements RxnormDb {
   constructor(private db: SQLiteDatabase) {}
@@ -27,6 +34,25 @@ export class ExpoRxnormDb implements RxnormDb {
   async baseIngredient(rxcui: number): Promise<ConceptRow | null> {
     return (
       (await this.db.getFirstAsync<ConceptRow>(BASE_INGREDIENT, [rxcui, rxcui])) ?? null
+    );
+  }
+
+  async primaryBrand(rxcui: number): Promise<{ name: string; reach: number } | null> {
+    return (
+      (await this.db.getFirstAsync<{ name: string; reach: number }>(PRIMARY_BRAND_FOR, [
+        rxcui,
+      ])) ?? null
+    );
+  }
+
+  async purposeFor(
+    rxcui: number,
+  ): Promise<{ purpose: string | null; uses: string | null } | null> {
+    return (
+      (await this.db.getFirstAsync<{ purpose: string | null; uses: string | null }>(
+        PURPOSE_FOR,
+        [rxcui],
+      )) ?? null
     );
   }
 

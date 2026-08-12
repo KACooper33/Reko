@@ -95,6 +95,8 @@ Two notes for anyone revisiting this:
 - [ ] **A5.** Extract the Top 100 OTC actives list — **decide the selection basis first** and write it down *(blocks A6–A9)*
 - [ ] **A6.** **Curate the brand allowlist by hand.** ~150–250 recognizable US household brands, ranked. Everything else suppressed
   - **A6's own test has been run for real (2026-08-11). Diphenhydramine returns 54 brands.** The recognisable ones are there — Benadryl, Aleve PM, Excedrin PM, Doans PM, Compoz — alongside `Acetadryl`, `Banophen Cream`, `Dermamycin`, `Diphenhist`, and **`Calagel Reformulated Jun 2019`**, which is a registry artefact rather than a brand any person would recognise
+  - **Prefix matching added 2026-08-12, +142 brands (408 → 550).** Jaccard penalises a short brand against a long product name — `gas-x` against `gas-x extra strength` scores **0.00**, `sudafed` only 0.32 — so the punchiest household names were being rejected by similarity alone. Prefix confirmation rescued Sudafed and Sudafed PE, and **no Rx brand leaked** (re-verified against Auvelity, Nuedexta, Bromfed DM, Apadaz, Bupap, Allzital, Capacet)
+    - Still missing: **Gas-X, Mylicon and Chlor-Trimeton have no openFDA OTC record linking them to their ingredient at all.** That is a source gap, not a threshold to tune
   - **Partly addressed 2026-08-11 by `scripts/tag-otc-brands.py`.** RxNorm supplies candidates, openFDA's NDC directory confirms them as OTC — ingredient-scoped, fuzzy at ≥0.60. 408 of 5,123 brands confirmed. **A6's own acceptance test now passes:** diphenhydramine returns Benadryl, ZzzQuil, Tylenol PM and 13 others, not 54. Auvelity, Nuedexta, Bromfed DM, Apadaz and Bupap are all excluded
     - **It over-suppresses on purpose.** DayQuil Cough and Zicam Cough are genuinely OTC and get dropped; a thinner answer beats a wrong one here. **This is a starting point for A6, not a replacement** — hand curation adds the false negatives back and ranks what remains
     - Confirmation is per brand, not per (brand, ingredient) pair. That imprecision is what took simethicone from 0 to 5 confirmed brands, via co-ingredients. Safe in the direction that matters: a purely-Rx brand is never confirmed anywhere
@@ -104,6 +106,9 @@ Two notes for anyone revisiting this:
   - Consequently A6 is **not** on the critical path for the database, and A5 does not block it
   - Test: does diphenhydramine return "Benadryl, ZzzQuil, Tylenol PM" and *not* forty store brands?
 - [ ] **A7.** Pull DailyMed SPL text for the Top 100
+  - **Partly done 2026-08-12, and cheaper than planned.** openFDA's label endpoint serves the same SPL sections, so **no scraper is needed**: `scripts/fetch-purposes.py` fetched `purpose` and `indications_and_usage` for the **159** ingredients reachable from a confirmed OTC brand. 134 have text
+  - **⚠️ The trap that nearly shipped a false statement.** openFDA's `purpose` section covers the whole product, so a combination cold medicine returns *"Pain reliever/fever reducer Cough suppressant Nasal decongestant"* — and attributing all of it to dextromethorphan says a cough suppressant is a pain reliever. The fetch now takes only **single-ingredient labels** and stores nothing when none exists. No answer beats a wrong one
+  - Still to do for A7 proper: the Top 100 selection (A5) and the plain-language pass (A8). `ingredient_purpose.purpose_display` is the reserved column for A8's hand-written copy
 - [ ] **A8.** Build-time generation pass: SPL text → plain language, per D7
 - [ ] **A9.** **Read all 100 personally.** Check tone against handoff §4 — plain, not childish
 - [x] **A10.** Add NLM attribution string to the source line — **done 2026-08-11.** Required verbatim by NLM's RxNorm Terms of Service, and now rendered in the app
@@ -160,6 +165,7 @@ Two notes for anyone revisiting this:
 - [ ] **B3d.** **Confirmation screen** — show what was found, let the user correct it. Never trust the scan silently (§3)
   - **Partly done 2026-08-11.** The demo asks "Is this what the label says?" before showing anything, and says plainly *"We are not certain about this one"* when the match is low-confidence. "No" retakes the photo
   - **Still missing: correction.** There is no per-ingredient editing, which is what the task actually asks for. Rejecting and rescanning is not the same thing
+  - **Result screen reworked 2026-08-12.** One recognisable brand — *"The main ingredient in Tylenol"* — with the rest behind a tap, plus what the ingredient is for. The brand is shown only when `reach >= 5`; below that it is omitted, because a weak brand defeats the point of the line. Chlorpheniramine and simethicone correctly show none rather than Clorrelief or Gelusil
 - [x] **B4.** Ship the SQLite as a bundled asset; wire lookup → brand bridge — **done 2026-08-11.** Full results: `docs/b4-findings.md`
   - `assets/rxnorm.sqlite` committed, loaded via `SQLiteProvider`'s `assetSource`; `metro.config.js` adds `sqlite` to `assetExts`, without which it fails at runtime rather than at build time
   - **8 of 8 matched ingredients resolve to brands.** `PIN → IN` works, so a label printing `Dextromethorphan HBr` surfaces **dextromethorphan** and its 17 brands
