@@ -6,6 +6,7 @@
  */
 import { DatabaseSync } from 'node:sqlite';
 import type { ConceptRow, RxnormDb } from './types';
+import { BASE_INGREDIENT, BRANDS_FOR, INGREDIENTS, META } from './queries';
 
 export class NodeRxnormDb implements RxnormDb {
   private db: DatabaseSync;
@@ -15,25 +16,25 @@ export class NodeRxnormDb implements RxnormDb {
   }
 
   async ingredients(): Promise<ConceptRow[]> {
-    return this.db
-      .prepare("SELECT rxcui, tty, name, name_norm FROM concepts WHERE tty IN ('IN','PIN')")
-      .all() as unknown as ConceptRow[];
+    return this.db.prepare(INGREDIENTS).all() as unknown as ConceptRow[];
   }
 
   async brandsFor(rxcui: number): Promise<string[]> {
-    // rxcui2 is the ingredient: RRF reads right to left. See src/match/rxnorm.ts.
-    const rows = this.db
-      .prepare(
-        `SELECT c.name FROM rel r JOIN concepts c ON c.rxcui = r.rxcui1
-          WHERE r.rxcui2 = ? AND r.rela = 'has_tradename' AND c.tty = 'BN'
-          ORDER BY c.name`,
-      )
-      .all(rxcui) as unknown as { name: string }[];
+    const rows = this.db.prepare(BRANDS_FOR).all(rxcui, rxcui, rxcui) as unknown as {
+      name: string;
+    }[];
     return rows.map((r) => r.name);
   }
 
+  async baseIngredient(rxcui: number): Promise<ConceptRow | null> {
+    const row = this.db.prepare(BASE_INGREDIENT).get(rxcui, rxcui) as
+      | ConceptRow
+      | undefined;
+    return row ?? null;
+  }
+
   async meta(key: string): Promise<string | null> {
-    const row = this.db.prepare('SELECT value FROM meta WHERE key = ?').get(key) as
+    const row = this.db.prepare(META).get(key) as
       | { value: string }
       | undefined;
     return row?.value ?? null;

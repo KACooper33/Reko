@@ -75,6 +75,12 @@ KEEP_RELA = {
     "tradename_of",
     "has_precise_ingredient",
     "precise_ingredient_of",
+    # PIN <-> IN. Added for B4 after measuring that without it the brand bridge
+    # returns ZERO brands for a PIN — and labels print the salt, so three of the
+    # four C4 products match a PIN rather than an IN. There is no other path from
+    # "Dextromethorphan HBr" back to "Dextromethorphan" in the pruned data.
+    "form_of",
+    "has_form",
 }
 
 

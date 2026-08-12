@@ -6,32 +6,32 @@
  */
 import type { SQLiteDatabase } from 'expo-sqlite';
 import type { ConceptRow, RxnormDb } from './types';
+import { BASE_INGREDIENT, BRANDS_FOR, INGREDIENTS, META } from './queries';
 
 export class ExpoRxnormDb implements RxnormDb {
   constructor(private db: SQLiteDatabase) {}
 
   async ingredients(): Promise<ConceptRow[]> {
-    return this.db.getAllAsync<ConceptRow>(
-      "SELECT rxcui, tty, name, name_norm FROM concepts WHERE tty IN ('IN','PIN')",
-    );
+    return this.db.getAllAsync<ConceptRow>(INGREDIENTS);
   }
 
   async brandsFor(rxcui: number): Promise<string[]> {
-    // rxcui2 is the ingredient — RRF reads right to left. See src/match/rxnorm.ts.
-    const rows = await this.db.getAllAsync<{ name: string }>(
-      `SELECT c.name FROM rel r JOIN concepts c ON c.rxcui = r.rxcui1
-        WHERE r.rxcui2 = ? AND r.rela = 'has_tradename' AND c.tty = 'BN'
-        ORDER BY c.name`,
-      [rxcui],
-    );
+    const rows = await this.db.getAllAsync<{ name: string }>(BRANDS_FOR, [
+      rxcui,
+      rxcui,
+      rxcui,
+    ]);
     return rows.map((r) => r.name);
   }
 
-  async meta(key: string): Promise<string | null> {
-    const row = await this.db.getFirstAsync<{ value: string }>(
-      'SELECT value FROM meta WHERE key = ?',
-      [key],
+  async baseIngredient(rxcui: number): Promise<ConceptRow | null> {
+    return (
+      (await this.db.getFirstAsync<ConceptRow>(BASE_INGREDIENT, [rxcui, rxcui])) ?? null
     );
+  }
+
+  async meta(key: string): Promise<string | null> {
+    const row = await this.db.getFirstAsync<{ value: string }>(META, [key]);
     return row?.value ?? null;
   }
 }
