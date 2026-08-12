@@ -80,16 +80,21 @@ export const BRANDS_FOR = `
 /**
  * The single recognisable brand for an ingredient.
  *
- * Measured: ordering by `reach` puts the household name first — Tylenol 95,
- * Mucinex 132, Advil 56, Benadryl 24, Delsym 9. Below roughly 5 it stops working
- * and returns things like Clorrelief (reach 1) for chlorpheniramine or Gelusil (1)
- * for simethicone.
+ * Ordering by `reach` puts the household name first — Tylenol 95, Mucinex 132,
+ * Advil 56, Benadryl 24, Delsym 9.
  *
- * So the threshold is a correctness boundary, not a tuning knob: above it, show the
- * brand; below it, show nothing. A weak brand is worse than no brand, because the
- * whole point of the line is recognition.
+ * THE THRESHOLD WAS 5, AND THAT WAS WRONG. It was set from two failures, both at
+ * reach 1 (Clorrelief for chlorpheniramine, Gelusil for simethicone), and then
+ * generalised. Reading the whole 2–4 band showed the real boundary sits between 1
+ * and 2: that band contains Imodium, Prilosec, Nexium, Voltaren, Narcan, Metamucil,
+ * Tagamet, Citrucel, Abreva, Listerine, Nasacort and Xyzal — none of them marginal.
+ *
+ * At 2, fifty-four more ingredients get a brand. Roughly half are instantly
+ * recognisable and the rest are real but unfamiliar; none is wrong. Being generous
+ * is safe because a weak line is no longer a hole — src/screens/Scan.tsx falls back
+ * to the ingredient's own name when nothing clears this bar at all.
  */
-export const PRIMARY_BRAND_MIN_REACH = 5;
+export const PRIMARY_BRAND_MIN_REACH = 2;
 
 export const PRIMARY_BRAND_FOR = `
   SELECT b.name, o.reach FROM rel r
