@@ -41,3 +41,15 @@ export function jaccard(a: Set<string>, b: Set<string>): number {
   for (const t of a) if (b.has(t)) shared++;
   return shared / (a.size + b.size - shared);
 }
+
+/**
+ * Capitalise an ingredient name for display.
+ *
+ * RxNorm stores IN names lowercase — "acetaminophen" — which on a screen reads like
+ * a mistake rather than a drug. Only the first letter is touched, because the rest
+ * of the string may carry meaningful case ("Vitamin B12") and because brand names
+ * arrive correctly cased already and must not be passed through this.
+ */
+export function forDisplay(name: string): string {
+  return name ? name[0].toUpperCase() + name.slice(1) : name;
+}

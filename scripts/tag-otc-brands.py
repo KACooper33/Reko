@@ -88,6 +88,22 @@ def main() -> None:
     export_date = payload.get("meta", {}).get("last_updated", "unknown")
     print(f"  openFDA: {len(records):,} records, exported {export_date}")
 
+    # Marketing reach: how many distinct OTC product names START WITH this brand.
+    #
+    # This is what puts Tylenol above Exaprin. Ordering brands alphabetically buried
+    # the only names anyone recognises — the acetaminophen list opened with
+    # "Arthriten Inflammatory Pain, Backaid, Backaid IPF" and Tylenol never appeared
+    # inside the visible eight.
+    #
+    # Counting exact brand matches does NOT work: openFDA lists Tylenol products as
+    # "Tylenol Extra Strength", "Tylenol 8 HR" and so on, so bare "Tylenol" scores 0
+    # while the store brand Pharbetol scores 7. Prefix matching fixes that —
+    # measured: Tylenol 95, Benadryl 24, Delsym 9.
+    #
+    # It is a proxy for how widely a brand is marketed, not for whether a person
+    # recognises it. A6's hand ranking is still the real answer.
+    otc_name_list: list[str] = []
+
     # OTC brand names, indexed by active ingredient name.
     otc_by_ing: dict[str, set[str]] = {}
     otc_records = 0
@@ -99,6 +115,7 @@ def main() -> None:
         if not brand:
             continue
         nb = normalize(brand)
+        otc_name_list.append(nb)
         for ai in r.get("active_ingredients") or []:
             name = ai.get("name")
             if name:
@@ -112,7 +129,8 @@ def main() -> None:
         CREATE TABLE brand_otc (
             rxcui     INTEGER PRIMARY KEY,  -- the BN
             confirmed INTEGER NOT NULL,     -- 1 = openFDA lists it as OTC
-            via       TEXT                  -- 'exact' | 'fuzzy' | NULL
+            via       TEXT,                 -- 'exact' | 'fuzzy' | NULL
+            reach     INTEGER NOT NULL      -- marketing reach; see below
         );
         """
     )
@@ -154,10 +172,23 @@ def main() -> None:
         else:
             verdict.setdefault(bn_rxcui, (0, None))
 
-    all_bns = [r[0] for r in db.execute("SELECT rxcui FROM concepts WHERE tty='BN'")]
+    all_bns = [
+        (r[0], r[1]) for r in db.execute("SELECT rxcui, name_norm FROM concepts WHERE tty='BN'")
+    ]
+    print(f"  scoring reach against {len(otc_name_list):,} OTC product names")
     db.executemany(
-        "INSERT OR REPLACE INTO brand_otc VALUES (?,?,?)",
-        [(b, *verdict.get(b, (0, None))) for b in all_bns],
+        "INSERT OR REPLACE INTO brand_otc VALUES (?,?,?,?)",
+        [
+            (
+                rxcui,
+                *verdict.get(rxcui, (0, None)),
+                # Only worth computing for brands that will actually be shown.
+                sum(1 for o in otc_name_list if o.startswith(nn))
+                if verdict.get(rxcui, (0, None))[0] == 1
+                else 0,
+            )
+            for rxcui, nn in all_bns
+        ],
     )
     db.execute(
         "INSERT OR REPLACE INTO meta VALUES ('openfda_export', ?)", (str(export_date),)
@@ -165,6 +196,7 @@ def main() -> None:
     db.execute("CREATE INDEX IF NOT EXISTS idx_brand_otc ON brand_otc(rxcui, confirmed)")
     db.commit()
 
+    all_bns = [b for b, _ in all_bns]
     conf = sum(1 for v in verdict.values() if v[0] == 1)
     print(f"\n  confirmed OTC: {conf:,} of {len(all_bns):,} brands")
     for via, n in db.execute(

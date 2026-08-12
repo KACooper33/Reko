@@ -134,6 +134,40 @@ permission is added to the manifest by the config plugin with no `app.json` entr
 
 ---
 
+## UI review, and two things it caught
+
+The screens were rendered by feeding a C4 fixture through the identical capture path,
+because the emulator camera cannot read a label. Reviewing them found two problems
+that no test would have:
+
+**Tylenol was not in the acetaminophen list.** Brands were ordered alphabetically and
+truncated, so the visible six were `Arthriten Inflammatory Pain, Backaid, Backaid IPF,
+Cetafen, CounterAct Pain, Dologesic` — and the one name everybody knows never
+appeared. That defeats the purpose of the screen.
+
+Fixed by ranking on **marketing reach**: how many distinct OTC product names begin
+with the brand. Counting *exact* brand matches does not work — openFDA lists Tylenol
+products as "Tylenol Extra Strength" and "Tylenol 8 HR", so bare "Tylenol" scores 0
+while the store brand Pharbetol scores 7. Prefix matching gives Tylenol 95,
+Benadryl 24, Delsym 9.
+
+```
+acetaminophen     Tylenol, Panadol, Tylenol PM, Pharbetol, Feverall, Cetafen  (+16 more)
+dextromethorphan  Delsym, Mielim Y Mas, Robafen Cough, Cepastat, Chloraseptic
+guaifenesin       Mucinex, Rompe Pecho, Robafen, Bronkaid
+```
+
+It is a proxy for how widely a brand is marketed, not for whether a person recognises
+it — `Mielim Y Mas` ranks second for dextromethorphan. **A6's hand ranking is still
+the real answer.**
+
+**Ingredient names rendered lowercase.** RxNorm stores IN names as "acetaminophen",
+which on screen reads as a typo rather than a drug. `forDisplay()` capitalises the
+first letter only, since brand names arrive correctly cased and must not pass through
+it.
+
+The list is also capped at six with "and N more", rather than truncating silently.
+
 ## Not done
 
 - **No real label has been scanned.** The emulator cannot. This is the one thing

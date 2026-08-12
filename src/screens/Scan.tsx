@@ -14,6 +14,7 @@ import { ExpoRxnormDb } from '../db/expo';
 import { findActivesSection } from '../parse/section';
 import { extractActives } from '../parse/actives';
 import { matchIngredient, prepareIndex, type PreparedIndex } from '../match/rxnorm';
+import { forDisplay } from '../ocr/normalize';
 
 /**
  * The demo screen. Scan a label, confirm what was found, see what else contains it.
@@ -109,7 +110,7 @@ export function Scan({ onOpenHarness }: { onOpenHarness: () => void }) {
         seen.add(key);
         found.push({
           printed: active.name,
-          ingredient: base?.name ?? top.name,
+          ingredient: forDisplay(base?.name ?? top.name),
           strength:
             active.strength !== null ? `${active.strength} ${active.unit ?? ''}`.trim() : '',
           brands: await db.brandsFor(top.rxcui),
@@ -220,11 +221,14 @@ export function Scan({ onOpenHarness }: { onOpenHarness: () => void }) {
               {f.brands.length > 0 ? (
                 <>
                   <Text style={s.alsoLabel}>Also found in</Text>
-                  {f.brands.slice(0, 8).map((b) => (
+                  {f.brands.slice(0, 6).map((b) => (
                     <Text key={b} style={s.brand}>
                       {b}
                     </Text>
                   ))}
+                  {f.brands.length > 6 && (
+                    <Text style={s.detail}>and {f.brands.length - 6} more</Text>
+                  )}
                 </>
               ) : (
                 <Text style={s.detail}>
