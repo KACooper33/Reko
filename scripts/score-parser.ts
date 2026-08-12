@@ -69,6 +69,7 @@ async function main() {
 
   let products = 0;
   let passed = 0;
+  let bridgeGaps = 0;
   const missingOcr: string[] = [];
 
   for (const { file, answer } of answers) {
@@ -108,6 +109,7 @@ async function main() {
       // Find the extracted line whose match resolves to the expected concept.
       let hit: string | null = null;
       let detail = '';
+      let topRxcui: number | null = null;
       for (const a of found.values()) {
         const m = matchIngredient(a.name, index, 3);
         const top = m.candidates[0];
@@ -115,6 +117,7 @@ async function main() {
         const topNorm = normalize(top.name);
         if (topNorm === target || target.startsWith(topNorm) || topNorm.startsWith(target)) {
           hit = a.name;
+          topRxcui = top.rxcui;
           detail =
             `${top.name} ${top.score.toFixed(2)}` +
             (m.confident ? '' : `  (not confident${m.candidates[1] ? `, next ${m.candidates[1].name} ${m.candidates[1].score.toFixed(2)}` : ''})`);
@@ -124,6 +127,19 @@ async function main() {
       if (hit) {
         ok++;
         lines.push(`      ✓ ${want.ingredient.padEnd(30)} ← ${detail}`);
+        // B4 — verify the brand bridge resolves. Querying only has_tradename
+        // returned ZERO brands for a PIN, and labels print the salt, so this is
+        // checked per product rather than assumed.
+        const base = topRxcui !== null ? await db.baseIngredient(topRxcui) : null;
+        const brands = topRxcui !== null ? await db.brandsFor(topRxcui) : [];
+        if (brands.length === 0) {
+          bridgeGaps++;
+          lines.push(`          ⚠ no brands — bridge gap`);
+        } else {
+          lines.push(
+            `          base: ${base?.name ?? '?'} · ${brands.length} brands · ${brands.slice(0, 4).join(', ')}`,
+          );
+        }
       } else {
         lines.push(`      ✗ ${want.ingredient.padEnd(30)} NOT MATCHED`);
       }
@@ -148,8 +164,13 @@ async function main() {
     console.log();
   }
   console.log(`${passed}/${products} products fully matched`);
+  console.log(
+    bridgeGaps === 0
+      ? 'brand bridge: every matched ingredient resolved to at least one brand'
+      : `brand bridge: ${bridgeGaps} matched ingredients returned NO brands`,
+  );
   db.close();
-  if (products && passed < products) process.exitCode = 1;
+  if ((products && passed < products) || bridgeGaps) process.exitCode = 1;
 }
 
 main();

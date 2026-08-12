@@ -16,8 +16,20 @@ export type ConceptRow = {
 export interface RxnormDb {
   /** All IN and PIN rows. Small enough (18,322) to hold in memory. */
   ingredients(): Promise<ConceptRow[]>;
-  /** Brand names for an ingredient RXCUI. */
+  /**
+   * Brand names for a concept, whether it is an IN or a PIN.
+   *
+   * Not "brands for an ingredient" — the distinction matters. Labels print the
+   * salt, so most real matches land on a PIN, and a PIN has no has_tradename
+   * edges at all. See src/db/queries.ts.
+   */
   brandsFor(rxcui: number): Promise<string[]>;
+  /**
+   * The base ingredient behind a concept: PIN -> IN, or the row itself if it is
+   * already an IN. This is the name Reko should show — "Dextromethorphan", not
+   * "Dextromethorphan Hydrobromide".
+   */
+  baseIngredient(rxcui: number): Promise<ConceptRow | null>;
   /** A value from the meta table — release date, attribution. */
   meta(key: string): Promise<string | null>;
 }

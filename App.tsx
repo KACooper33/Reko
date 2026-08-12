@@ -61,7 +61,14 @@ const FRAMES = [
   },
 ] as const;
 
-type Row = { active: Active; match: ReturnType<typeof matchIngredient> };
+type Row = {
+  active: Active;
+  match: ReturnType<typeof matchIngredient>;
+  /** The base ingredient behind the match — the name worth showing a person. */
+  base: string | null;
+  /** B4's payoff: other products carrying the same ingredient. */
+  brands: string[];
+};
 
 type RunState = {
   frameKey: string;
@@ -141,10 +148,26 @@ function Harness() {
       const actives = section ? extractActives(section.lines) : [];
 
       const t1 = Date.now();
-      const rows: Row[] = index
+      const matched = index
         ? actives.map((active) => ({ active, match: matchIngredient(active.name, index, 3) }))
         : [];
       const matchMs = Date.now() - t1;
+
+      // B4 — the brand bridge. Only for the top candidate, and only when there
+      // is one: bridging from a guess would compound a wrong match into a wrong
+      // list of products.
+      const db = new ExpoRxnormDb(sqlite);
+      const rows: Row[] = [];
+      for (const m of matched) {
+        const top = m.match.candidates[0];
+        if (!top) {
+          rows.push({ ...m, base: null, brands: [] });
+          continue;
+        }
+        const base = await db.baseIngredient(top.rxcui);
+        const brands = await db.brandsFor(top.rxcui);
+        rows.push({ ...m, base: base?.name ?? null, brands });
+      }
 
       setRun({
         frameKey: frame.key,
@@ -230,7 +253,7 @@ function Harness() {
 
           <Text style={styles.metaStrong}>ACTIVES FOUND</Text>
           {run.rows?.length ? (
-            run.rows.map(({ active, match }, i) => (
+            run.rows.map(({ active, match, base, brands }, i) => (
               <View key={i} style={styles.row}>
                 <Text style={styles.mono}>
                   {active.name} — {active.strength ?? '?'} {active.unit ?? ''}
@@ -241,6 +264,21 @@ function Harness() {
                     {j === 0 && !match.confident ? '   (not confident)' : ''}
                   </Text>
                 ))}
+                {base && <Text style={styles.base}>{base}</Text>}
+                {brands.length > 0 && (
+                  <>
+                    <Text style={styles.brands}>
+                      also in: {brands.slice(0, 6).join(' · ')}
+                    </Text>
+                    {/* The count is shown deliberately. A6 exists because RxNorm
+                        returns everything, including registry artefacts like
+                        "Calagel Reformulated Jun 2019". Hiding the number would
+                        hide the problem the allowlist is meant to solve. */}
+                    <Text style={styles.brandsMeta}>
+                      {brands.length} brands, unfiltered — A6 allowlist not yet applied
+                    </Text>
+                  </>
+                )}
               </View>
             ))
           ) : (
@@ -300,5 +338,8 @@ const styles = StyleSheet.create({
   metaStrong: { fontSize: 13, fontWeight: '700', marginTop: 4 },
   mono: { fontFamily: 'monospace', fontSize: 11, lineHeight: 15 },
   monoDim: { fontFamily: 'monospace', fontSize: 11, lineHeight: 15, opacity: 0.6 },
+  base: { fontSize: 15, fontWeight: '600', marginTop: 4 },
+  brands: { fontSize: 13, lineHeight: 18, marginTop: 2 },
+  brandsMeta: { fontSize: 10, opacity: 0.5, marginTop: 1 },
   legal: { fontSize: 11, opacity: 0.7, lineHeight: 15 },
 });
