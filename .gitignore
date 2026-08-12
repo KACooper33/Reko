@@ -84,3 +84,7 @@ Thumbs.db
 # Body text for the current pull request. Regenerated per PR, stale the moment
 # one merges — passed to `gh pr create --body-file`, never committed.
 PR_DESCRIPTION.md
+
+# Python bytecode from the Track A scripts
+__pycache__/
+*.pyc

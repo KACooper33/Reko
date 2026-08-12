@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { recognizeText, type OcrResult } from 'expo-ocr-kit';
 import { ExpoRxnormDb } from './src/db/expo';
+import { Scan } from './src/screens/Scan';
 import { findActivesSection } from './src/parse/section';
 import { extractActives, type Active } from './src/parse/actives';
 import { matchIngredient, prepareIndex, type PreparedIndex } from './src/match/rxnorm';
@@ -39,10 +40,19 @@ const FRAMES = [
     module: require('./assets/test-labels/topcare_daytime_coldandflu_ingredients.jpg'),
   },
   {
-    key: 'mucinex',
-    label: 'Mucinex (curved bottle)',
-    file: 'mucinex_cough',
-    module: require('./assets/test-labels/mucinex_cough.jpg'),
+    key: 'mucinex1',
+    label: 'Mucinex frame 1 (curved bottle, full names)',
+    file: 'mucinex_cough_1',
+    module: require('./assets/test-labels/mucinex_cough_1.jpg'),
+  },
+  {
+    // The wrapped continuation. Strengths survive; the names are cut off at the
+    // label edge ("omethorphan HBr 5 mg"). Neither frame alone is complete, which
+    // is what makes this the first real test of B2c's merge.
+    key: 'mucinex2',
+    label: 'Mucinex frame 2 (wrapped, names truncated)',
+    file: 'mucinex_cough_2',
+    module: require('./assets/test-labels/mucinex_cough_2.jpg'),
   },
   {
     key: 'nyquil',
@@ -89,12 +99,35 @@ export default function App() {
       databaseName="rxnorm.sqlite"
       assetSource={{ assetId: require('./assets/rxnorm.sqlite') }}
     >
-      <Harness />
+      <Router />
     </SQLiteProvider>
   );
 }
 
-function Harness() {
+/**
+ * Routing state lives BELOW SQLiteProvider, deliberately.
+ *
+ * Measured: with the conditional inline as SQLiteProvider's children, a state
+ * change in the parent never reached the screen. The provider does not re-render
+ * children when its parent re-renders, so the branch was frozen at mount — the
+ * onPress fired, the setter ran, and nothing happened. Cold starts behaved the
+ * same, so it was not a Fast Refresh artefact.
+ *
+ * Keeping the state here means the provider's children element is stable and this
+ * component re-renders normally.
+ */
+function Router() {
+  // The demo is the default. The harness stays reachable, because it is the only
+  // regression suite that exists and it produces the frozen OCR fixtures.
+  const [showHarness, setShowHarness] = useState(false);
+  return showHarness ? (
+    <Harness onBack={() => setShowHarness(false)} />
+  ) : (
+    <Scan onOpenHarness={() => setShowHarness(true)} />
+  );
+}
+
+function Harness({ onBack }: { onBack: () => void }) {
   const sqlite = useSQLiteContext();
   const [index, setIndex] = useState<PreparedIndex | null>(null);
   const [indexMs, setIndexMs] = useState(0);
@@ -191,22 +224,9 @@ function Harness() {
 
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.pageContent}>
-      {/* ---- B1 artefact: keep until the S8 rows close ---- */}
-      <Text style={styles.wordmark}>Reko</Text>
-      <Pressable
-        disabled
-        accessibilityRole="button"
-        accessibilityLabel="Scan a label"
-        accessibilityHint="Not available yet"
-        accessibilityState={{ disabled: true }}
-        style={styles.scanButton}
-      >
-        <Text style={styles.scanIcon}>📷</Text>
-        <Text style={styles.scanLabel}>Scan a label</Text>
+      <Pressable onPress={onBack} style={styles.backLink}>
+        <Text style={styles.backText}>← back to Reko</Text>
       </Pressable>
-      <Text style={styles.status}>Not available yet</Text>
-
-      <View style={styles.rule} />
       <Text style={styles.sectionTitle}>B3 harness — OCR, parse, match</Text>
       <Text style={styles.hint}>
         {index
@@ -338,6 +358,8 @@ const styles = StyleSheet.create({
   metaStrong: { fontSize: 13, fontWeight: '700', marginTop: 4 },
   mono: { fontFamily: 'monospace', fontSize: 11, lineHeight: 15 },
   monoDim: { fontFamily: 'monospace', fontSize: 11, lineHeight: 15, opacity: 0.6 },
+  backLink: { paddingVertical: 8 },
+  backText: { fontSize: 15, color: '#1b4ed8' },
   base: { fontSize: 15, fontWeight: '600', marginTop: 4 },
   brands: { fontSize: 13, lineHeight: 18, marginTop: 2 },
   brandsMeta: { fontSize: 10, opacity: 0.5, marginTop: 1 },
