@@ -148,10 +148,12 @@ async function main() {
         const primary = await db.primaryBrand(baseRxcui);
         const purposeRow = await db.purposeFor(baseRxcui);
         if (!purposeRow?.purpose) missingPurpose++;
-        lines.push(
-          `          shown: ${primary ? `"main ingredient in ${primary.name}" (reach ${primary.reach})` : 'NO primary brand'}` +
-            ` · ${purposeRow?.purpose ?? 'NO purpose'}`,
-        );
+        // Mirror exactly what the screen renders, including the fallback, so the
+        // harness output cannot drift from what a person actually sees.
+        const shown = primary
+          ? `"main ingredient in ${primary.name}" (reach ${primary.reach})`
+          : `"sold as ${base?.name ?? want.ingredient}" (fallback)`;
+        lines.push(`          shown: ${shown} · ${purposeRow?.purpose ?? 'NO purpose'}`);
       } else {
         lines.push(`      ✗ ${want.ingredient.padEnd(30)} NOT MATCHED`);
       }

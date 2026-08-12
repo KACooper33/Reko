@@ -239,11 +239,23 @@ export function Scan({ onOpenHarness }: { onOpenHarness: () => void }) {
               <Text style={s.ingredient}>{f.ingredient}</Text>
               {f.strength ? <Text style={s.detail}>{f.strength} {stage.basis ?? ''}</Text> : null}
 
-              {f.primaryBrand && (
-                <Text style={s.headline}>
-                  The main ingredient in <Text style={s.brandName}>{f.primaryBrand}</Text>
-                </Text>
-              )}
+              {/* When no brand clears the threshold, the line falls back to the
+                  ingredient's own name rather than disappearing. The slot always
+                  carries a name, so the card never has a hole in it — and the
+                  wording drops "the main ingredient in", which would be circular
+                  read against the ingredient itself. */}
+              <Text style={s.headline}>
+                {f.primaryBrand ? (
+                  <>
+                    The main ingredient in{' '}
+                    <Text style={s.brandName}>{f.primaryBrand}</Text>
+                  </>
+                ) : (
+                  <>
+                    Sold as <Text style={s.brandName}>{f.ingredient}</Text>
+                  </>
+                )}
+              </Text>
 
               {f.brands.length > 0 && (
                 <Pressable
