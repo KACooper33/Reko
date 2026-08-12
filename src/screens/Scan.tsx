@@ -69,7 +69,10 @@ export function Scan({ onOpenHarness }: { onOpenHarness: () => void }) {
   const [attribution, setAttribution] = useState<string | null>(null);
   const [fdaDate, setFdaDate] = useState<string | null>(null);
   const [stage, setStage] = useState<Stage>({ name: 'intro' });
-  const [expanded, setExpanded] = useState<Record<number, boolean>>({});
+  // Keyed by ingredient rather than card position. Index keys let one product's
+  // expanded state land on a different ingredient in the next scan, which is how a
+  // fresh result arrived already showing "Hide the other products".
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     (async () => {
@@ -85,6 +88,8 @@ export function Scan({ onOpenHarness }: { onOpenHarness: () => void }) {
     const shot = await camera.current?.takePictureAsync();
     if (!shot?.uri || !index) return;
     setStage({ name: 'working' });
+    // Every scan starts collapsed. Without this the previous scan's state carries over.
+    setExpanded({});
 
     try {
       // takePictureAsync gives a file URI, which is exactly what the OCR module
@@ -262,22 +267,22 @@ export function Scan({ onOpenHarness }: { onOpenHarness: () => void }) {
 
               {f.brands.length > 0 && (
                 <Pressable
-                  onPress={() => setExpanded((e) => ({ ...e, [i]: !e[i] }))}
+                  onPress={() => setExpanded((e) => ({ ...e, [f.ingredient]: !e[f.ingredient] }))}
                   accessibilityRole="button"
                   hitSlop={10}
                   style={({ pressed }) => [s.expandRow, pressed && s.dim]}
                 >
                   <Text style={s.expandText}>
-                    {expanded[i]
+                    {expanded[f.ingredient]
                       ? 'Hide the other products'
                       : `Also in ${f.brands.length} other ${
                           f.brands.length === 1 ? 'product' : 'products'
                         }`}
                   </Text>
-                  <Text style={s.expandChevron}>{expanded[i] ? '⌃' : '⌄'}</Text>
+                  <Text style={s.expandChevron}>{expanded[f.ingredient] ? '⌃' : '⌄'}</Text>
                 </Pressable>
               )}
-              {expanded[i] &&
+              {expanded[f.ingredient] &&
                 f.brands.map((b) => (
                   <Text key={b} style={s.brand}>
                     {b}
