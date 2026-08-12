@@ -30,7 +30,8 @@
     "owner": "kacooper",
     "plugins": [
       "expo-ocr-kit",
-      "expo-asset"
+      "expo-asset",
+      "expo-sqlite"
     ]
   }
 }

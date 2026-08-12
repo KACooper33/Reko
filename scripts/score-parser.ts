@@ -1,0 +1,155 @@
+/**
+ * Scores the B3a → B3b → B3c pipeline against the C4 golden set.
+ *
+ *     npx tsx scripts/score-parser.ts
+ *
+ * Reads the frozen OCR output beside each fixture, so this runs on the laptop
+ * with no device and no emulator. That is the point: the parser is developed
+ * against measured OCR rather than against a live camera.
+ *
+ * C4 is the instrument, not the grade. A failure here is a fact about the
+ * parser; a failure that disagrees with the label is a fact about the fixture.
+ */
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { findActivesSection, type OcrResult } from '../src/parse/section';
+import { extractActives } from '../src/parse/actives';
+import { matchIngredient, prepareIndex } from '../src/match/rxnorm';
+import { normalize } from '../src/ocr/normalize';
+import { NodeRxnormDb } from '../src/db/node';
+
+const DIR = 'assets/test-labels';
+
+type Answer = {
+  product: string;
+  basis: string | null;
+  frames: string[];
+  actives: { printed: string; ingredient: string; strength: string }[];
+};
+
+/** Minimal front-matter reader for the fixture format. */
+function readAnswer(path: string): Answer {
+  const raw = readFileSync(path, 'utf8');
+  const body = raw.replace(/^---\n/, '').replace(/\n---[\s\S]*$/, '');
+  const answer: Answer = { product: '', basis: null, frames: [], actives: [] };
+  let mode: '' | 'frames' | 'actives' = '';
+  let current: Record<string, string> | null = null;
+
+  for (const line of body.split('\n')) {
+    if (/^product:/.test(line)) answer.product = line.split(':').slice(1).join(':').trim();
+    else if (/^basis:/.test(line)) answer.basis = line.split(':').slice(1).join(':').trim() || null;
+    else if (/^frames:/.test(line)) mode = 'frames';
+    else if (/^actives:/.test(line)) mode = 'actives';
+    else if (/^notes:/.test(line)) mode = '';
+    else if (mode === 'frames' && /^\s*-\s/.test(line)) {
+      answer.frames.push(line.replace(/^\s*-\s*/, '').trim());
+    } else if (mode === 'actives') {
+      const item = line.match(/^\s*-\s*(\w+):\s*(.*)$/);
+      const cont = line.match(/^\s{4,}(\w+):\s*(.*)$/);
+      if (item) {
+        current = { [item[1]]: item[2].trim() };
+        answer.actives.push(current as Answer['actives'][number]);
+      } else if (cont && current) {
+        current[cont[1]] = cont[2].trim();
+      }
+    }
+  }
+  return answer;
+}
+
+async function main() {
+  const db = new NodeRxnormDb();
+  const index = prepareIndex(await db.ingredients());
+  const release = await db.meta('rxnorm_release');
+  console.log(`RxNorm ${release} · ${index.length.toLocaleString()} IN/PIN concepts\n`);
+
+  const answers = readdirSync(DIR)
+    .filter((f) => f.endsWith('.md') && f !== 'README.md')
+    .map((f) => ({ file: f, answer: readAnswer(join(DIR, f)) }));
+
+  let products = 0;
+  let passed = 0;
+  const missingOcr: string[] = [];
+
+  for (const { file, answer } of answers) {
+    // The frame set is the unit. Merge the actives found across every frame that
+    // has frozen OCR — that is B2c's union, exercised here without a camera.
+    const found = new Map<string, ReturnType<typeof extractActives>[number]>();
+    const vias: string[] = [];
+    let basis: string | null = null;
+
+    for (const frame of answer.frames) {
+      const ocrPath = join(DIR, frame.replace(/\.jpg$/, '.ocr.json'));
+      if (!existsSync(ocrPath)) {
+        missingOcr.push(ocrPath);
+        continue;
+      }
+      const ocr = JSON.parse(readFileSync(ocrPath, 'utf8')) as OcrResult;
+      const section = findActivesSection(ocr);
+      if (!section) continue;
+      vias.push(section.via);
+      basis ??= section.basis;
+      for (const a of extractActives(section.lines)) {
+        if (!found.has(normalize(a.name))) found.set(normalize(a.name), a);
+      }
+    }
+
+    if (!answer.frames.some((f) => existsSync(join(DIR, f.replace(/\.jpg$/, '.ocr.json'))))) {
+      continue; // no frozen OCR for this product yet
+    }
+
+    products++;
+    const expected = answer.actives;
+    const lines: string[] = [];
+    let ok = 0;
+
+    for (const want of expected) {
+      const target = normalize(want.ingredient || want.printed);
+      // Find the extracted line whose match resolves to the expected concept.
+      let hit: string | null = null;
+      let detail = '';
+      for (const a of found.values()) {
+        const m = matchIngredient(a.name, index, 3);
+        const top = m.candidates[0];
+        if (!top) continue;
+        const topNorm = normalize(top.name);
+        if (topNorm === target || target.startsWith(topNorm) || topNorm.startsWith(target)) {
+          hit = a.name;
+          detail =
+            `${top.name} ${top.score.toFixed(2)}` +
+            (m.confident ? '' : `  (not confident${m.candidates[1] ? `, next ${m.candidates[1].name} ${m.candidates[1].score.toFixed(2)}` : ''})`);
+          break;
+        }
+      }
+      if (hit) {
+        ok++;
+        lines.push(`      ✓ ${want.ingredient.padEnd(30)} ← ${detail}`);
+      } else {
+        lines.push(`      ✗ ${want.ingredient.padEnd(30)} NOT MATCHED`);
+      }
+    }
+
+    const all = ok === expected.length;
+    if (all) passed++;
+    const basisOk = !answer.basis || (basis && normalize(basis) === normalize(answer.basis));
+
+    console.log(
+      `  [${all ? 'PASS' : 'FAIL'}] ${answer.product}  ` +
+        `${ok}/${expected.length} actives · via ${vias.join('+') || 'none'} · ` +
+        `basis ${basisOk ? 'ok' : `MISMATCH (got ${basis ?? 'none'}, want ${answer.basis})`}`,
+    );
+    for (const l of lines) console.log(l);
+    console.log();
+  }
+
+  if (missingOcr.length) {
+    console.log('Frames without frozen OCR (run the export in the app):');
+    for (const p of new Set(missingOcr)) console.log(`  ${p}`);
+    console.log();
+  }
+  console.log(`${passed}/${products} products fully matched`);
+  db.close();
+  if (products && passed < products) process.exitCode = 1;
+}
+
+main();

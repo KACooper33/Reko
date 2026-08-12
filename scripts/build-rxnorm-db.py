@@ -32,7 +32,11 @@ NORMALIZATION
   separate, evidence-led step, and the trigram index is what absorbs deletions.
 """
 
+import datetime
+import glob
 import os
+import re
+import shutil
 import sqlite3
 import sys
 import time
@@ -40,6 +44,26 @@ import unicodedata
 
 RAW = "data/raw"
 OUT = "data/rxnorm.sqlite"
+
+# The committed, bundled copy. data/ stays gitignored as the working directory;
+# this asset is deliberate, because EAS builds in the cloud and cannot
+# regenerate it — there is no UMLS key and no 248 MB download in a cloud build.
+#
+# Committing this is permitted: the build keeps SAB=RXNORM rows only, and
+# RxNorm's own normalized names and RXCUIs are US government-created and in the
+# public domain. The restricted material is the proprietary third-party source
+# vocabularies, which are filtered out. See docs/a3-a4-findings.md.
+ASSET = "assets/rxnorm.sqlite"
+
+# Required verbatim by NLM's RxNorm Terms of Service when redistributing.
+# Stored in the database so the string travels with the data it describes,
+# rather than drifting in a separate constant somewhere in the app.
+NLM_ATTRIBUTION = (
+    "This product uses publicly available data courtesy of the U.S. National "
+    "Library of Medicine (NLM), National Institutes of Health, Department of "
+    "Health and Human Services; NLM is not responsible for the product and "
+    "does not endorse or recommend this or any other product."
+)
 
 KEEP_TTY = {"IN", "PIN", "BN"}
 
@@ -63,6 +87,24 @@ def normalize(s: str) -> str:
 def die(msg: str) -> None:
     print(f"error: {msg}", file=sys.stderr)
     sys.exit(1)
+
+
+def release_date() -> str:
+    """The release actually built from, taken from the downloaded zip's name.
+
+    NLM's terms require a redistributor either to keep the data current or to
+    disclose that the bundled copy is not the most current. A database frozen
+    inside an APK is stale by definition, so the app discloses this date — which
+    means it has to be the real one, not a hardcoded guess.
+    """
+    zips = glob.glob(os.path.join(RAW, "RxNorm_full_*.zip"))
+    if not zips:
+        die(f"no RxNorm_full_*.zip in {RAW} — cannot determine the release date")
+    m = re.search(r"RxNorm_full_(\d{2})(\d{2})(\d{4})\.zip", os.path.basename(zips[0]))
+    if not m:
+        die(f"cannot parse a release date from {zips[0]}")
+    mm, dd, yyyy = m.groups()
+    return datetime.date(int(yyyy), int(mm), int(dd)).isoformat()
 
 
 def main() -> None:
@@ -92,8 +134,25 @@ def main() -> None:
             rela   TEXT    NOT NULL,
             rxcui2 INTEGER NOT NULL
         );
+        CREATE TABLE meta (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
         """
     )
+
+    rel_date = release_date()
+    db.executemany(
+        "INSERT INTO meta VALUES (?,?)",
+        [
+            ("rxnorm_release", rel_date),
+            ("built_at", datetime.datetime.now().astimezone().isoformat(timespec="seconds")),
+            ("source", "RxNorm full monthly release, SAB=RXNORM rows only"),
+            ("attribution", NLM_ATTRIBUTION),
+        ],
+    )
+    db.commit()
+    print(f"meta:     RxNorm release {rel_date}")
 
     # ---- pass 1: concepts ---------------------------------------------------
     t0 = time.time()
@@ -206,6 +265,11 @@ def main() -> None:
         print("  ⚠  over target, under the 50 MB hard stop")
     else:
         print("  ❌ OVER THE HARD STOP — the brand allowlist (A6) becomes load-bearing")
+
+    # Publish the bundled copy. This one is committed, so the cloud build has it.
+    os.makedirs(os.path.dirname(ASSET), exist_ok=True)
+    shutil.copy2(OUT, ASSET)
+    print(f"{ASSET}  copied — commit this one")
 
 
 if __name__ == "__main__":

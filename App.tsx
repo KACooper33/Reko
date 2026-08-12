@@ -1,6 +1,8 @@
 import { StatusBar } from 'expo-status-bar';
 import { Asset } from 'expo-asset';
-import { useState } from 'react';
+import { File, Paths } from 'expo-file-system';
+import { SQLiteProvider, useSQLiteContext } from 'expo-sqlite';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -10,103 +12,159 @@ import {
   View,
 } from 'react-native';
 import { recognizeText, type OcrResult } from 'expo-ocr-kit';
+import { ExpoRxnormDb } from './src/db/expo';
+import { findActivesSection } from './src/parse/section';
+import { extractActives, type Active } from './src/parse/actives';
+import { matchIngredient, prepareIndex, type PreparedIndex } from './src/match/rxnorm';
 
 /**
- * B1 + B2a in one build.
+ * B1 + B2a + B3a-c in one build.
  *
- * The wordmark and the disabled camera control are B1's acceptance artefact —
- * they stay until B1's S8 rows close, so one build serves both.
+ * The wordmark and disabled camera control are B1's acceptance artefact and stay
+ * until B1's S8 rows close. Below them is the development harness: run OCR on a
+ * bundled C4 frame, parse it, match against the bundled RxNorm database, and
+ * export the raw OCR so the laptop scoring harness has frozen input.
  *
- * Below that is B2a: run OCR on a bundled still image and dump the raw text.
- * No camera. The whole point is to learn whether expo-ocr-kit 0.1.4 works on
- * SDK 57 before any capture UI exists, and to see what B3a will be parsing.
+ * The attribution line and the "data as of" date are NOT optional decoration.
+ * NLM's RxNorm terms require attribution, and require a redistributor either to
+ * keep data current or disclose that it is not. Both strings come from the
+ * database's meta table so they cannot drift from the data they describe.
  */
 
-// Frames come from the C4 golden set. Order is easiest first: if the control
-// case fails, the problem is the module, not the photograph.
 const FRAMES = [
   {
     key: 'topcare',
     label: 'TopCare (control — flat panel)',
+    file: 'topcare_daytime_coldandflu_ingredients',
     module: require('./assets/test-labels/topcare_daytime_coldandflu_ingredients.jpg'),
-    expected: 'Acetaminophen 325 / Dextromethorphan HBr 10 / Phenylephrine HCl 5',
   },
   {
     key: 'mucinex',
     label: 'Mucinex (curved bottle)',
+    file: 'mucinex_cough',
     module: require('./assets/test-labels/mucinex_cough.jpg'),
-    expected: 'Dextromethorphan HBr 5 / Guaifenesin 100',
   },
   {
     key: 'nyquil',
     label: 'NyQuil (inverted, translucent)',
+    file: 'nyquil_kids_cold_and_cough_withbarcode',
     module: require('./assets/test-labels/nyquil_kids_cold_and_cough_withbarcode.jpg'),
-    expected: 'Chlorpheniramine maleate 2 / Dextromethorphan HBr 15',
   },
   {
     // Measured worst of the four, which was not the guess. Small print on a
     // narrow cylinder corrupts both the heading and the drug name, while
-    // NyQuil's inverted white-on-blue reads cleanly. Print size and curvature
-    // predict failure; contrast polarity does not. See docs/b2a-ocr-findings.md
+    // NyQuil's inverted white-on-blue reads cleanly. See docs/b2a-ocr-findings.md
     key: 'mylicon',
     label: 'Mylicon (hardest — small print, narrow cylinder)',
+    file: 'infants_mylicon',
     module: require('./assets/test-labels/infants_mylicon.jpg'),
-    expected: 'Simethicone 20',
   },
 ] as const;
+
+type Row = { active: Active; match: ReturnType<typeof matchIngredient> };
 
 type RunState = {
   frameKey: string;
   status: 'running' | 'ok' | 'error';
-  uriUsed?: string;
-  strippedScheme?: boolean;
-  ms?: number;
-  result?: OcrResult;
+  ocrMs?: number;
+  matchMs?: number;
+  via?: string;
+  basis?: string | null;
+  rows?: Row[];
+  raw?: OcrResult;
+  exported?: string;
   error?: string;
 };
 
 export default function App() {
+  return (
+    <SQLiteProvider
+      databaseName="rxnorm.sqlite"
+      assetSource={{ assetId: require('./assets/rxnorm.sqlite') }}
+    >
+      <Harness />
+    </SQLiteProvider>
+  );
+}
+
+function Harness() {
+  const sqlite = useSQLiteContext();
+  const [index, setIndex] = useState<PreparedIndex | null>(null);
+  const [indexMs, setIndexMs] = useState(0);
+  const [release, setRelease] = useState<string | null>(null);
+  const [attribution, setAttribution] = useState<string | null>(null);
   const [run, setRun] = useState<RunState | null>(null);
 
-  async function runOcr(frame: (typeof FRAMES)[number]) {
+  useEffect(() => {
+    (async () => {
+      const db = new ExpoRxnormDb(sqlite);
+      setRelease(await db.meta('rxnorm_release'));
+      setAttribution(await db.meta('attribution'));
+      const t0 = Date.now();
+      const rows = await db.ingredients();
+      const prepared = prepareIndex(rows);
+      setIndexMs(Date.now() - t0);
+      setIndex(prepared);
+    })();
+  }, [sqlite]);
+
+  async function runFrame(frame: (typeof FRAMES)[number]) {
     setRun({ frameKey: frame.key, status: 'running' });
-    const started = Date.now();
     try {
-      // A bundler reference is not a file path. The native module needs a real
-      // file on disk, which is what downloadAsync + localUri produces.
       const asset = Asset.fromModule(frame.module);
       await asset.downloadAsync();
-      const localUri = asset.localUri ?? asset.uri;
+      const uri = asset.localUri ?? asset.uri;
 
-      // Some native modules reject the file:// scheme. Try as-is, then bare.
-      let result: OcrResult;
-      let strippedScheme = false;
+      const t0 = Date.now();
+      let raw: OcrResult;
       try {
-        result = await recognizeText(localUri);
-      } catch (first) {
-        strippedScheme = true;
-        result = await recognizeText(localUri.replace(/^file:\/\//, ''));
+        raw = await recognizeText(uri);
+      } catch {
+        raw = await recognizeText(uri.replace(/^file:\/\//, ''));
       }
+      const ocrMs = Date.now() - t0;
+
+      // Freeze the OCR for the laptop harness. Written to the app's document
+      // directory; pull it with:
+      //   adb exec-out run-as com.kacooper.reko cat files/<name>.ocr.json
+      const name = `${frame.file}.ocr.json`;
+      let exported: string | undefined;
+      try {
+        const out = new File(Paths.document, name);
+        out.write(JSON.stringify(raw, null, 2));
+        exported = name;
+      } catch (e) {
+        exported = `export failed: ${e instanceof Error ? e.message : String(e)}`;
+      }
+
+      const section = findActivesSection(raw);
+      const actives = section ? extractActives(section.lines) : [];
+
+      const t1 = Date.now();
+      const rows: Row[] = index
+        ? actives.map((active) => ({ active, match: matchIngredient(active.name, index, 3) }))
+        : [];
+      const matchMs = Date.now() - t1;
 
       setRun({
         frameKey: frame.key,
         status: 'ok',
-        uriUsed: localUri,
-        strippedScheme,
-        ms: Date.now() - started,
-        result,
+        ocrMs,
+        matchMs,
+        via: section?.via ?? 'none',
+        basis: section?.basis ?? null,
+        rows,
+        raw,
+        exported,
       });
     } catch (e) {
       setRun({
         frameKey: frame.key,
         status: 'error',
-        ms: Date.now() - started,
         error: e instanceof Error ? `${e.name}: ${e.message}` : String(e),
       });
     }
   }
-
-  const active = FRAMES.find((f) => f.key === run?.frameKey);
 
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.pageContent}>
@@ -125,16 +183,24 @@ export default function App() {
       </Pressable>
       <Text style={styles.status}>Not available yet</Text>
 
-      {/* ---- B2a harness ---- */}
       <View style={styles.rule} />
-      <Text style={styles.sectionTitle}>B2a — OCR on a still image</Text>
-      <Text style={styles.hint}>No camera. Reads a bundled C4 frame.</Text>
+      <Text style={styles.sectionTitle}>B3 harness — OCR, parse, match</Text>
+      <Text style={styles.hint}>
+        {index
+          ? `${index.length.toLocaleString()} IN/PIN concepts indexed in ${indexMs} ms`
+          : 'loading the RxNorm index…'}
+      </Text>
 
       {FRAMES.map((frame) => (
         <Pressable
           key={frame.key}
-          onPress={() => runOcr(frame)}
-          style={({ pressed }) => [styles.frameButton, pressed && styles.framePressed]}
+          onPress={() => runFrame(frame)}
+          disabled={!index}
+          style={({ pressed }) => [
+            styles.frameButton,
+            pressed && styles.framePressed,
+            !index && styles.frameDisabled,
+          ]}
         >
           <Text style={styles.frameLabel}>{frame.label}</Text>
         </Pressable>
@@ -143,41 +209,54 @@ export default function App() {
       {run?.status === 'running' && (
         <View style={styles.panel}>
           <ActivityIndicator />
-          <Text style={styles.meta}>Recognising…</Text>
+          <Text style={styles.meta}>Working…</Text>
         </View>
       )}
 
       {run?.status === 'error' && (
         <View style={[styles.panel, styles.panelError]}>
-          <Text style={styles.metaStrong}>FAILED after {run.ms} ms</Text>
+          <Text style={styles.metaStrong}>FAILED</Text>
           <Text style={styles.mono}>{run.error}</Text>
         </View>
       )}
 
-      {run?.status === 'ok' && run.result && (
+      {run?.status === 'ok' && (
         <View style={styles.panel}>
           <Text style={styles.metaStrong}>
-            {run.result.text.length} chars · {run.result.blocks.length} blocks · {run.ms} ms
+            OCR {run.ocrMs} ms · match {run.matchMs} ms · section via {run.via}
           </Text>
-          <Text style={styles.meta}>
-            uri: {run.strippedScheme ? 'file:// stripped' : 'used as-is'}
-          </Text>
-          {active && <Text style={styles.meta}>expected: {active.expected}</Text>}
+          <Text style={styles.meta}>basis: {run.basis ?? '(none found)'}</Text>
+          <Text style={styles.meta}>exported: {run.exported}</Text>
 
-          <Text style={styles.metaStrong}>RAW TEXT</Text>
-          <Text style={styles.mono} selectable>
-            {run.result.text || '(empty)'}
-          </Text>
-
-          <Text style={styles.metaStrong}>BLOCKS</Text>
-          {run.result.blocks.map((b, i) => (
-            <Text key={i} style={styles.mono} selectable>
-              [{i}] y={Math.round(b.boundingBox.y)} x={Math.round(b.boundingBox.x)}{' '}
-              {JSON.stringify(b.text)}
-            </Text>
-          ))}
+          <Text style={styles.metaStrong}>ACTIVES FOUND</Text>
+          {run.rows?.length ? (
+            run.rows.map(({ active, match }, i) => (
+              <View key={i} style={styles.row}>
+                <Text style={styles.mono}>
+                  {active.name} — {active.strength ?? '?'} {active.unit ?? ''}
+                </Text>
+                {match.candidates.slice(0, 2).map((c, j) => (
+                  <Text key={j} style={styles.monoDim}>
+                    {j === 0 ? '→' : '  '} {c.score.toFixed(2)} {c.tty} {c.name}
+                    {j === 0 && !match.confident ? '   (not confident)' : ''}
+                  </Text>
+                ))}
+              </View>
+            ))
+          ) : (
+            <Text style={styles.mono}>none</Text>
+          )}
         </View>
       )}
+
+      {/* ---- NLM licence obligations. Not decoration. ---- */}
+      <View style={styles.rule} />
+      <Text style={styles.metaStrong}>Source</Text>
+      <Text style={styles.legal}>
+        RxNorm data as of {release ?? '…'}. This bundled copy is not updated automatically
+        and may not reflect the most current data from NLM.
+      </Text>
+      <Text style={styles.legal}>{attribution ?? ''}</Text>
 
       <StatusBar style="auto" />
     </ScrollView>
@@ -212,10 +291,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   framePressed: { backgroundColor: '#eee' },
+  frameDisabled: { opacity: 0.4 },
   frameLabel: { fontSize: 15 },
   panel: { gap: 8, padding: 12, backgroundColor: '#f6f6f6', borderRadius: 8 },
   panelError: { backgroundColor: '#fdecea' },
+  row: { marginBottom: 8 },
   meta: { fontSize: 12, opacity: 0.7 },
   metaStrong: { fontSize: 13, fontWeight: '700', marginTop: 4 },
   mono: { fontFamily: 'monospace', fontSize: 11, lineHeight: 15 },
+  monoDim: { fontFamily: 'monospace', fontSize: 11, lineHeight: 15, opacity: 0.6 },
+  legal: { fontSize: 11, opacity: 0.7, lineHeight: 15 },
 });
