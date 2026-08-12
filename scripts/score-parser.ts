@@ -71,6 +71,7 @@ async function main() {
   let passed = 0;
   let bridgeGaps = 0;
   let phantoms = 0;   // extracted ingredients that would be SHOWN but are not on the label
+  let missingPurpose = 0;
   const missingOcr: string[] = [];
 
   for (const { file, answer } of answers) {
@@ -141,6 +142,16 @@ async function main() {
             `          base: ${base?.name ?? '?'} · ${brands.length} brands · ${brands.slice(0, 4).join(', ')}`,
           );
         }
+        // What the screen actually leads with. A missing purpose or primary brand is a
+        // real gap in the demo, so it is reported rather than left to be noticed.
+        const baseRxcui = base?.rxcui ?? topRxcui!;
+        const primary = await db.primaryBrand(baseRxcui);
+        const purposeRow = await db.purposeFor(baseRxcui);
+        if (!purposeRow?.purpose) missingPurpose++;
+        lines.push(
+          `          shown: ${primary ? `"main ingredient in ${primary.name}" (reach ${primary.reach})` : 'NO primary brand'}` +
+            ` · ${purposeRow?.purpose ?? 'NO purpose'}`,
+        );
       } else {
         lines.push(`      ✗ ${want.ingredient.padEnd(30)} NOT MATCHED`);
       }
@@ -194,6 +205,11 @@ async function main() {
     phantoms === 0
       ? 'precision: no invented ingredients would reach a user'
       : `precision: ${phantoms} PHANTOM ingredients would be shown — not on any label`,
+  );
+  console.log(
+    missingPurpose === 0
+      ? 'purpose: every matched ingredient states what it is for'
+      : `purpose: ${missingPurpose} matched ingredients have no purpose text`,
   );
   db.close();
   if ((products && passed < products) || bridgeGaps || phantoms) process.exitCode = 1;

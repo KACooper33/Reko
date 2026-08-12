@@ -39,8 +39,15 @@ type Found = {
   /** The base ingredient — the name a person recognises. */
   ingredient: string;
   strength: string;
-  /** Other OTC products containing it. */
+  /**
+   * The one recognisable brand, or null when none is trustworthy.
+   * Null is shown as nothing at all: a weak brand defeats the point of the line.
+   */
+  primaryBrand: string | null;
+  /** Every other OTC product containing it, behind the tap. */
   brands: string[];
+  /** What the ingredient is for. openFDA's wording until A8 rewrites it. */
+  purpose: string | null;
   /** False when a different real drug scored close. Drives the wording. */
   confident: boolean;
 };
@@ -60,13 +67,16 @@ export function Scan({ onOpenHarness }: { onOpenHarness: () => void }) {
   const [index, setIndex] = useState<PreparedIndex | null>(null);
   const [release, setRelease] = useState<string | null>(null);
   const [attribution, setAttribution] = useState<string | null>(null);
+  const [fdaDate, setFdaDate] = useState<string | null>(null);
   const [stage, setStage] = useState<Stage>({ name: 'intro' });
+  const [expanded, setExpanded] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     (async () => {
       const db = new ExpoRxnormDb(sqlite);
       setRelease(await db.meta('rxnorm_release'));
       setAttribution(await db.meta('attribution'));
+      setFdaDate(await db.meta('openfda_purposes_fetched'));
       setIndex(prepareIndex(await db.ingredients()));
     })();
   }, [sqlite]);
@@ -108,12 +118,22 @@ export function Scan({ onOpenHarness }: { onOpenHarness: () => void }) {
         // and those must not become two ingredients.
         if (seen.has(key)) continue;
         seen.add(key);
+        // Purpose and primary brand hang off the BASE ingredient, not the salt: the
+        // label says "Dextromethorphan HBr" but what it does, and what it is famous
+        // as, belong to dextromethorphan.
+        const baseRxcui = base?.rxcui ?? top.rxcui;
+        const primary = await db.primaryBrand(baseRxcui);
+        const purposeRow = await db.purposeFor(baseRxcui);
+        const allBrands = await db.brandsFor(top.rxcui);
         found.push({
           printed: active.name,
           ingredient: forDisplay(base?.name ?? top.name),
           strength:
             active.strength !== null ? `${active.strength} ${active.unit ?? ''}`.trim() : '',
-          brands: await db.brandsFor(top.rxcui),
+          primaryBrand: primary?.name ?? null,
+          // The primary is shown on its own line, so exclude it from the expansion.
+          brands: allBrands.filter((b) => b !== primary?.name),
+          purpose: purposeRow?.purpose ?? null,
           confident: match.confident,
         });
       }
@@ -218,23 +238,38 @@ export function Scan({ onOpenHarness }: { onOpenHarness: () => void }) {
             <View key={i} style={s.card}>
               <Text style={s.ingredient}>{f.ingredient}</Text>
               {f.strength ? <Text style={s.detail}>{f.strength} {stage.basis ?? ''}</Text> : null}
-              {f.brands.length > 0 ? (
-                <>
-                  <Text style={s.alsoLabel}>Also found in</Text>
-                  {f.brands.slice(0, 6).map((b) => (
-                    <Text key={b} style={s.brand}>
-                      {b}
-                    </Text>
-                  ))}
-                  {f.brands.length > 6 && (
-                    <Text style={s.detail}>and {f.brands.length - 6} more</Text>
-                  )}
-                </>
-              ) : (
-                <Text style={s.detail}>
-                  We do not have a list of other products for this one.
+
+              {f.primaryBrand && (
+                <Text style={s.headline}>
+                  The main ingredient in <Text style={s.brandName}>{f.primaryBrand}</Text>
                 </Text>
               )}
+
+              {f.brands.length > 0 && (
+                <Pressable
+                  onPress={() => setExpanded((e) => ({ ...e, [i]: !e[i] }))}
+                  accessibilityRole="button"
+                  hitSlop={10}
+                  style={({ pressed }) => [s.expandRow, pressed && s.dim]}
+                >
+                  <Text style={s.expandText}>
+                    {expanded[i]
+                      ? 'Hide the other products'
+                      : `Also in ${f.brands.length} other ${
+                          f.brands.length === 1 ? 'product' : 'products'
+                        }`}
+                  </Text>
+                  <Text style={s.expandChevron}>{expanded[i] ? '⌃' : '⌄'}</Text>
+                </Pressable>
+              )}
+              {expanded[i] &&
+                f.brands.map((b) => (
+                  <Text key={b} style={s.brand}>
+                    {b}
+                  </Text>
+                ))}
+
+              {f.purpose && <Text style={s.purpose}>{f.purpose}</Text>}
             </View>
           ))}
           <Text style={s.caution}>
@@ -271,9 +306,10 @@ export function Scan({ onOpenHarness }: { onOpenHarness: () => void }) {
       <View style={s.rule} />
       <Text style={s.legal}>
         Ingredient and brand data from the U.S. National Library of Medicine, RxNorm
-        release {release ?? '…'}. This copy is not updated automatically and may not
-        reflect the most current data from NLM. Brands shown are over-the-counter
-        products only.
+        release {release ?? '…'}. What each ingredient is for, and which brands are sold
+        over the counter, from the U.S. Food and Drug Administration, retrieved{' '}
+        {fdaDate ?? '…'}. This copy is not updated automatically and may not reflect the
+        most current data from either source.
       </Text>
       <Text style={s.legal}>{attribution ?? ''}</Text>
       <Pressable
@@ -328,7 +364,12 @@ const s = StyleSheet.create({
   ingredient: { fontSize: 26, fontWeight: '700' },
   detail: { fontSize: 16, opacity: 0.75 },
   unsure: { fontSize: 15, color: '#8a4b00', marginTop: 4, lineHeight: 21 },
-  alsoLabel: { fontSize: 15, opacity: 0.6, marginTop: 10 },
+  headline: { fontSize: 18, lineHeight: 25, marginTop: 8 },
+  brandName: { fontWeight: '700' },
+  expandRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6 },
+  expandText: { fontSize: 15, color: '#1b4ed8' },
+  expandChevron: { fontSize: 13, color: '#1b4ed8' },
+  purpose: { fontSize: 16, opacity: 0.8, marginTop: 8 },
   brand: { fontSize: 19, lineHeight: 27 },
   caution: { fontSize: 15, lineHeight: 22, opacity: 0.75 },
   rule: { height: 1, backgroundColor: '#e2e2e2', marginTop: 24 },

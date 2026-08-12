@@ -30,6 +30,13 @@ export interface RxnormDb {
    * "Dextromethorphan Hydrobromide".
    */
   baseIngredient(rxcui: number): Promise<ConceptRow | null>;
+  /**
+   * The one recognisable brand, or null when none is trustworthy enough to show.
+   * Null is a real answer here — see PRIMARY_BRAND_MIN_REACH.
+   */
+  primaryBrand(rxcui: number): Promise<{ name: string; reach: number } | null>;
+  /** What the ingredient is for. */
+  purposeFor(rxcui: number): Promise<{ purpose: string | null; uses: string | null } | null>;
   /** A value from the meta table — release date, attribution. */
   meta(key: string): Promise<string | null>;
 }

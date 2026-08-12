@@ -76,3 +76,39 @@ export const BRANDS_FOR = `
   -- under "Arthriten Inflammatory Pain" and it never reached the visible list.
   ORDER BY reach DESC, LENGTH(name), name
 `;
+
+/**
+ * The single recognisable brand for an ingredient.
+ *
+ * Measured: ordering by `reach` puts the household name first — Tylenol 95,
+ * Mucinex 132, Advil 56, Benadryl 24, Delsym 9. Below roughly 5 it stops working
+ * and returns things like Clorrelief (reach 1) for chlorpheniramine or Gelusil (1)
+ * for simethicone.
+ *
+ * So the threshold is a correctness boundary, not a tuning knob: above it, show the
+ * brand; below it, show nothing. A weak brand is worse than no brand, because the
+ * whole point of the line is recognition.
+ */
+export const PRIMARY_BRAND_MIN_REACH = 5;
+
+export const PRIMARY_BRAND_FOR = `
+  SELECT b.name, o.reach FROM rel r
+    JOIN concepts b ON b.rxcui = r.rxcui1
+    JOIN brand_otc o ON o.rxcui = b.rxcui AND o.confirmed = 1
+   WHERE r.rela = 'has_tradename' AND b.tty = 'BN' AND r.rxcui2 = ?
+     AND o.reach >= ${PRIMARY_BRAND_MIN_REACH}
+   ORDER BY o.reach DESC, LENGTH(b.name), b.name
+   LIMIT 1
+`;
+
+/**
+ * What the ingredient is for.
+ *
+ * `purpose_display` wins when present — that column is where hand-written copy goes
+ * when A8 runs. Until then this returns openFDA's own wording, which is accurate but
+ * clinical: "Antigas", "Antihistamine". Deliberate interim choice.
+ */
+export const PURPOSE_FOR = `
+  SELECT COALESCE(purpose_display, purpose) AS purpose, uses
+    FROM ingredient_purpose WHERE rxcui = ?
+`;

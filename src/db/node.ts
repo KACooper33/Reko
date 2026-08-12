@@ -6,7 +6,14 @@
  */
 import { DatabaseSync } from 'node:sqlite';
 import type { ConceptRow, RxnormDb } from './types';
-import { BASE_INGREDIENT, BRANDS_FOR, INGREDIENTS, META } from './queries';
+import {
+  BASE_INGREDIENT,
+  BRANDS_FOR,
+  INGREDIENTS,
+  META,
+  PRIMARY_BRAND_FOR,
+  PURPOSE_FOR,
+} from './queries';
 
 export class NodeRxnormDb implements RxnormDb {
   private db: DatabaseSync;
@@ -29,6 +36,22 @@ export class NodeRxnormDb implements RxnormDb {
   async baseIngredient(rxcui: number): Promise<ConceptRow | null> {
     const row = this.db.prepare(BASE_INGREDIENT).get(rxcui, rxcui) as
       | ConceptRow
+      | undefined;
+    return row ?? null;
+  }
+
+  async primaryBrand(rxcui: number): Promise<{ name: string; reach: number } | null> {
+    const row = this.db.prepare(PRIMARY_BRAND_FOR).get(rxcui) as
+      | { name: string; reach: number }
+      | undefined;
+    return row ?? null;
+  }
+
+  async purposeFor(
+    rxcui: number,
+  ): Promise<{ purpose: string | null; uses: string | null } | null> {
+    const row = this.db.prepare(PURPOSE_FOR).get(rxcui) as
+      | { purpose: string | null; uses: string | null }
       | undefined;
     return row ?? null;
   }
